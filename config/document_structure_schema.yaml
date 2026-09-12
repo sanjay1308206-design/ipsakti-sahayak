@@ -1,0 +1,152 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 3 machine-readable structural output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_03_LEGAL_STRUCTURE_EXTRACTION.md
+#
+# This is the SHAPE produced by src/ingestion/serialize.to_json. It is not
+# a chunking/retrieval schema (Phase 4+); it is Phase 3's normalized,
+# provenance-preserving document representation.
+
+schema_version: "1.0.0"
+
+detection_states: ["DETECTED", "NOT_DETECTED", "UNKNOWN"]
+
+block_types: ["HEADING", "PARAGRAPH", "TABLE", "LIST", "LIST_ITEM", "UNKNOWN"]
+
+page_extraction_statuses: ["SUCCESS", "EMPTY", "OCR_REQUIRED", "FAILED"]
+
+table_extraction_statuses: ["DETECTED", "NOT_ATTEMPTED_FOR_PDF", "NOT_APPLICABLE"]
+
+document:
+  description: "Top-level normalized document representation."
+  fields:
+    - name: "document_id"
+      type: "string"
+      required: true
+      description: "From the input provenance record; never invented."
+    - name: "source_family_id"
+      type: "string"
+      required: true
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+    - name: "document_type"
+      type: "enum"
+      allowed_values: ["TEXT", "HTML", "PDF"]
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+      description: "Propagated verbatim from the input provenance record (PROV-SAFE-01/05 in config/corpus_provenance_schema.yaml)."
+    - name: "integrity"
+      type: "object"
+      required: true
+      fields:
+        - name: "claimed_content_hash"
+          type: "string"
+          required: true
+        - name: "computed_content_hash"
+          type: "string"
+          required: true
+        - name: "match"
+          type: "boolean"
+          required: true
+    - name: "extraction_status"
+      type: "enum"
+      allowed_values: ["EXTRACTION_SUCCESS", "EXTRACTION_PARTIAL", "EXTRACTION_FAILED", "OCR_REQUIRED"]
+      required: true
+    - name: "table_extraction_status"
+      type: "enum"
+      enum_ref: "table_extraction_statuses"
+      required: true
+    - name: "title"
+      type: "object"
+      required: true
+      fields:
+        - name: "detection_status"
+          type: "enum"
+          enum_ref: "detection_states"
+          required: true
+        - name: "text"
+          type: "string"
+          required: false
+    - name: "pages"
+      type: "list[page]"
+      required: true
+    - name: "warnings"
+      type: "list[string]"
+      required: true
+
+page:
+  description: "One page (PDF: real page; TEXT/HTML: always exactly one, page_number=1)."
+  fields:
+    - name: "page_number"
+      type: "integer"
+      required: true
+    - name: "extraction_status"
+      type: "enum"
+      enum_ref: "page_extraction_statuses"
+      required: true
+    - name: "blocks"
+      type: "list[block]"
+      required: true
+    - name: "warnings"
+      type: "list[string]"
+      required: true
+
+block:
+  description: "One structural unit within a page, in document reading order."
+  fields:
+    - name: "block_id"
+      type: "string"
+      required: true
+      description: "Deterministic identifier, e.g. '<document_id>:p<page_number>:b<sequence>'."
+    - name: "sequence"
+      type: "integer"
+      required: true
+      description: "Monotonically increasing within the document; establishes reading order."
+    - name: "block_type"
+      type: "enum"
+      enum_ref: "block_types"
+      required: true
+    - name: "text"
+      type: "string"
+      required: true
+    - name: "page_number"
+      type: "integer"
+      required: true
+      description: "Redundant with the containing Page for direct block-level traceability (docs/PHASE_03_DOCUMENT_INGESTION.md Section O)."
+    - name: "heading_level"
+      type: "integer_or_unknown_or_null"
+      required: false
+      description: "1-6 when confidently detected; the string 'UNKNOWN' when a heading is DETECTED but its level cannot be determined; null when not a heading."
+    - name: "parent_section"
+      type: "string_or_null"
+      required: false
+      description: "block_id of the nearest preceding HEADING block, where detectable."
+    - name: "table"
+      type: "object_or_null"
+      required: false
+      fields:
+        - name: "rows"
+          type: "list[list[string]]"
+          required: true
+        - name: "detection_status"
+          type: "enum"
+          enum_ref: "detection_states"
+          required: true
+    - name: "warnings"
+      type: "list[string]"
+      required: true
+
+safety_invariants:
+  - id: "STRUCT-SAFE-01"
+    rule: "A block's heading_level is never fabricated as a specific integer when the underlying signal (e.g. all-caps heuristic) cannot support one; UNKNOWN must be used instead of guessing."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "STRUCT-SAFE-02"
+    rule: "table_extraction_status for PDF documents is always NOT_ATTEMPTED_FOR_PDF, never a per-page guess about table presence."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "STRUCT-SAFE-03"
+    rule: "Every block carries page_number and the document carries document_id/source_family_id/jurisdiction/integrity.claimed_content_hash, preserving full block-to-source traceability."
+    source_label: "[OFFICIAL SOURCE]"

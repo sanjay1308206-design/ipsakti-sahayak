@@ -1,0 +1,106 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 3 machine-readable document ingestion contract (pipeline states).
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_03_DOCUMENT_INGESTION.md
+# Implementation: src/ingestion/pipeline.py
+
+contract_version: "1.0.0"
+
+# These are engineering pipeline states, not legal classifications
+# (docs/PHASE_03_DOCUMENT_INGESTION.md Section M).
+pipeline_states:
+  - "READY_FOR_INGESTION"
+  - "REJECTED_INPUT"
+  - "EXTRACTION_SUCCESS"
+  - "EXTRACTION_PARTIAL"
+  - "EXTRACTION_FAILED"
+  - "OCR_REQUIRED"
+  - "QUARANTINED"
+
+accepted_input_states:
+  # A document may only enter extraction if its provenance record's
+  # admission_status is one of these (config/corpus_lock.yaml admission_states
+  # superset; REJECT/HOLD_FOR_VALIDATION/SUPERSEDED are excluded here).
+  - "ADMIT"
+  - "ADMIT_WITH_RESTRICTION"
+
+accepted_document_types: ["TEXT", "HTML", "PDF"]
+
+required_provenance_fields:
+  # Subset of config/corpus_provenance_schema.yaml required for the
+  # admission boundary specifically (docs/PHASE_03_DOCUMENT_INGESTION.md
+  # Section C).
+  - "document_id"
+  - "source_family_id"
+  - "jurisdiction"
+  - "content_hash"
+  - "admission_status"
+  - "synthetic"
+
+required_integrity_fields:
+  - "claimed_content_hash"
+  - "computed_content_hash"
+  - "match"
+
+extraction_states: ["EXTRACTION_SUCCESS", "EXTRACTION_PARTIAL", "EXTRACTION_FAILED", "OCR_REQUIRED"]
+
+structural_states: ["DETECTED", "NOT_DETECTED", "UNKNOWN"]
+
+failure_states: ["REJECTED_INPUT", "EXTRACTION_FAILED"]
+
+quarantine_states: ["QUARANTINED"]
+
+quarantine_reasons:
+  - "PATH_TRAVERSAL_ATTEMPT"
+  - "EMPTY_FILE"
+  - "OVERSIZED_INPUT"
+  - "CONTENT_HASH_MISMATCH"
+  - "FILE_NOT_FOUND"
+
+rejection_reasons:
+  - "MISSING_DOCUMENT_IDENTITY"
+  - "MISSING_SOURCE_FAMILY"
+  - "UNKNOWN_SOURCE_FAMILY"
+  - "SOURCE_FAMILY_NOT_EVIDENCE_SOURCE"
+  - "UNKNOWN_JURISDICTION"
+  - "JURISDICTION_MISMATCH"
+  - "MISSING_CONTENT_HASH"
+  - "INVALID_ADMISSION_STATE"
+  - "UNSUPPORTED_DOCUMENT_TYPE"
+
+extraction_warning_codes:
+  - "DECODE_ERROR_REPLACED_CHARACTERS"
+  - "EMPTY_PAGE"
+  - "PARSER_EXCEPTION"
+  - "ENCRYPTED_PDF_UNSUPPORTED"
+  - "PDF_TABLE_EXTRACTION_NOT_IMPLEMENTED"
+  - "TABLE_STRUCTURE_SIMPLIFIED"
+
+output_requirements:
+  - "Output must conform to config/document_structure_schema.yaml."
+  - "Output must be deterministic JSON (sort_keys, fixed separators, UTF-8) for identical input bytes + provenance."
+  - "Output must never embed a wall-clock ingestion timestamp inside the deterministic content payload."
+  - "Output must propagate the input provenance record's synthetic flag unchanged."
+
+warning_requirements:
+  - "Every extraction limitation (decode error, empty page, parser exception, missing OCR, unavailable table extraction) must be recorded as an explicit warning code, never silently dropped."
+  - "Warnings never block a QUARANTINED/REJECTED_INPUT classification from firing when a harder precondition fails first."
+
+security_limits:
+  max_input_bytes: 50000000  # [ENGINEERING RECOMMENDATION] explicit, testable, arbitrary bound - not from the Master Reference
+  allowed_extensions: [".txt", ".html", ".htm", ".pdf"]
+
+safety_invariants:
+  - id: "INGEST-SAFE-01"
+    rule: "A document whose admission_status is not in accepted_input_states must never reach extraction, regardless of file content."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "INGEST-SAFE-02"
+    rule: "A content_hash mismatch between the claimed and computed hash must always result in QUARANTINED, never a silent pass-through."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "INGEST-SAFE-03"
+    rule: "No extractor may raise an uncaught exception out of ingest_document; every parser failure must be converted to EXTRACTION_FAILED with a warning."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "INGEST-SAFE-04"
+    rule: "No OCR is performed; a page with empty/whitespace-only extracted text is marked OCR_REQUIRED, never fabricated content."
+    source_label: "[OFFICIAL SOURCE]"

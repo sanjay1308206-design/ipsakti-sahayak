@@ -1,0 +1,128 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 1 machine-readable regulatory decision tree.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_01_REGULATORY_DECISION_TREE.md
+# Enum values referenced below are fixed in config/domain_taxonomy.yaml
+#
+# This is a CONTRACT describing the rule order/semantics for traceability
+# and testing. The actual deterministic evaluation logic (matching this
+# contract exactly) is implemented, for test purposes only, in
+# tests/_decision_tree_reference_impl.py — a small dependency-light
+# reference evaluator, NOT the production Phase 11 classification engine.
+# No condition string here is executed/eval'd; conditions are documented
+# for human/audit traceability and cross-checked by test against the
+# reference implementation's behavior.
+
+tree_version: "1.0.0"
+
+input_fields:
+  - name: "user_intent"
+    enum_ref: "user_intent_categories"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - name: "formulation_regulatory_track"
+    enum_ref: "regulatory_track"
+    source_label: "[OFFICIAL SOURCE]"
+  - name: "jurisdiction"
+    enum_ref: "jurisdiction_inputs"
+    source_label: "[OFFICIAL SOURCE]"
+  - name: "regulatory_question_type"
+    enum_ref: "regulatory_question_categories"
+    source_label: "[OFFICIAL SOURCE]"
+  - name: "evidence_state"
+    enum_ref: "evidence_states"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+evidence_requiring_intents:
+  # Mirrors user_intent_categories[*].evidence_requiring == true in
+  # config/domain_taxonomy.yaml. Duplicated here (and tested for
+  # consistency) so the tree contract is self-contained and auditable.
+  - "DETERMINE_REGULATORY_CLASSIFICATION"
+  - "DETERMINE_IP_PROTECTION_PATHWAY"
+  - "CHECK_COMPLIANCE_REQUIREMENT"
+  - "LOOKUP_AUTHORITATIVE_SOURCE"
+
+terminal_states:
+  - "KNOWN"
+  - "UNKNOWN"
+  - "AMBIGUOUS"
+  - "NEEDS_EVIDENCE"
+
+# Ordered, first-match-wins. Order is part of the contract and is tested.
+stages:
+  - stage: 1
+    rule_id: "R1"
+    name: "MISSING_USER_INTENT"
+    condition: "user_intent == 'UNDETERMINED'"
+    result_state: "UNKNOWN"
+    reason_code: "MISSING_USER_INTENT"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - stage: 2
+    rule_id: "R2"
+    name: "MISSING_JURISDICTION"
+    condition: "jurisdiction == 'UNSPECIFIED'"
+    result_state: "UNKNOWN"
+    reason_code: "MISSING_JURISDICTION"
+    source_label: "[OFFICIAL SOURCE]"
+
+  - stage: 3
+    rule_id: "R3"
+    name: "MISSING_FORMULATION_INFO"
+    condition: "user_intent in evidence_requiring_intents and formulation_regulatory_track == 'UNDETERMINED'"
+    result_state: "UNKNOWN"
+    reason_code: "MISSING_FORMULATION_INFO"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - stage: 4
+    rule_id: "R4"
+    name: "CONFLICTING_FORMULATION_SIGNALS"
+    condition: "formulation_regulatory_track == 'CONFLICTING'"
+    result_state: "AMBIGUOUS"
+    reason_code: "CONFLICTING_FORMULATION_SIGNALS"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - stage: 5
+    rule_id: "R5"
+    name: "AMBIGUOUS_USER_INTENT"
+    condition: "user_intent == 'AMBIGUOUS_INTENT'"
+    result_state: "AMBIGUOUS"
+    reason_code: "AMBIGUOUS_USER_INTENT"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - stage: 6
+    rule_id: "R6"
+    name: "UNRECOGNIZED_REGULATORY_QUESTION_TYPE"
+    condition: "regulatory_question_type == 'UNDETERMINED' or regulatory_question_type not in RQ_ENUM"
+    result_state: "UNKNOWN"
+    reason_code: "UNRECOGNIZED_REGULATORY_QUESTION_TYPE"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - stage: 7
+    rule_id: "R7"
+    name: "EVIDENCE_NOT_AVAILABLE"
+    condition: "user_intent in evidence_requiring_intents and evidence_state != 'SUFFICIENT_EVIDENCE'"
+    result_state: "NEEDS_EVIDENCE"
+    reason_code: "EVIDENCE_NOT_AVAILABLE"
+    source_label: "[OFFICIAL SOURCE]"
+
+  - stage: 8
+    rule_id: "R8"
+    name: "DEFAULT_KNOWN"
+    condition: "otherwise"
+    result_state: "KNOWN"
+    reason_code: null
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+escalation_derivation:
+  requires_evidence:
+    rule: "true iff classification_state == 'NEEDS_EVIDENCE'"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  requires_escalation:
+    rule: "true iff classification_state == 'AMBIGUOUS'"
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+non_goals:
+  - "No LLM call, external API call, or model inference occurs in this tree."
+  - "No retrieval, embedding, or evidence-store lookup happens here; evidence_state is an opaque input."
+  - "No jurisdiction firewall enforcement happens here; jurisdiction is an opaque input."

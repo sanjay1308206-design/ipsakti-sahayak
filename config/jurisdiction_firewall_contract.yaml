@@ -1,0 +1,103 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 12 machine-readable jurisdiction-firewall contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_12_JURISDICTION_FIREWALL.md
+# Implementation: src/jurisdiction/firewall.py, policy.py, filtering.py, models.py
+#
+# CRITICAL: this contract does NOT define a third jurisdiction vocabulary.
+# It documents Phase 12's OWN mapping between two vocabularies that
+# already exist elsewhere in this repository:
+#   - REQUEST-side (config/domain_taxonomy.yaml jurisdiction_inputs)
+#   - EVIDENCE-side (config/authority_matrix.yaml valid_jurisdictions)
+
+contract_version: "1.0.0"
+
+jurisdiction_schema_version: "1.0.0"
+
+reused_contracts:
+  - "config/domain_taxonomy.yaml (taxonomy_version 1.0.0) - jurisdiction_inputs vocabulary, unchanged (request-side)."
+  - "config/authority_matrix.yaml (authority_matrix_version 1.0.0) - valid_jurisdictions vocabulary, unchanged (evidence-side)."
+  - "config/classification_contract.yaml (contract_version 1.0.0) - Phase 11's ClassificationResult.jurisdiction_input, reused as the primary request-side signal."
+
+# Closed status vocabulary, reused wholesale from Phase 1 - no parallel
+# state system. NEEDS_EVIDENCE is retained for vocabulary consistency but
+# is documented as unreachable: no reason code maps to it, since no
+# scenario in this project's actual contracts has jurisdiction routing
+# resolved BY retrieving evidence (that would be circular).
+state_vocabulary: ["KNOWN", "UNKNOWN", "AMBIGUOUS", "NEEDS_EVIDENCE"]
+
+# Closed, every member independently reachable and tested.
+reason_code_vocabulary:
+  [
+    "EXPLICIT_JURISDICTION_ACCEPTED",
+    "JURISDICTION_UNKNOWN",
+    "JURISDICTION_AMBIGUOUS",
+    "JURISDICTION_NOT_SUPPORTED",
+    "JURISDICTION_METADATA_INVALID",
+    "CORPUS_NOT_PERMITTED",
+    "CROSS_JURISDICTION_EVIDENCE_BLOCKED",
+  ]
+
+# The ONLY corpus-policy mapping this phase defines. BOTH legitimately
+# maps to the union (Phase 1's own taxonomy semantics) - never a guess.
+# UNSPECIFIED maps to the empty set - fail closed, never "everything" and
+# never "India by default".
+request_to_evidence_jurisdiction_mapping:
+  INDIA: ["INDIA"]
+  INTERNATIONAL: ["INTERNATIONAL"]
+  BOTH: ["INDIA", "INTERNATIONAL"]
+  UNSPECIFIED: []
+
+# Deterministic normalization only - case/whitespace folding of the four
+# canonical request-side tokens. No country-alias database exists;
+# country-level legal behavior remains [DEFERRED] (docs "COUNTRY NAMES").
+normalization_policy: "CASE_AND_WHITESPACE_FOLDING_OF_THE_FOUR_CANONICAL_TOKENS_ONLY_NO_COUNTRY_DATABASE_NO_GEOLOCATION_NO_LANGUAGE_INFERENCE"
+
+# In this repository, Phase 5-7 exposes exactly one retrieval index, not
+# one per jurisdiction - "corpus" and "jurisdiction" are therefore
+# definitionally identical fields here, disclosed honestly rather than
+# implying separate-index infrastructure that does not exist yet.
+corpus_vs_jurisdiction_field_equivalence: "ALLOWED_CORPORA_EQUALS_ALLOWED_JURISDICTIONS_UNTIL_PHASE_5_7_EXPOSES_NAMED_PER_JURISDICTION_INDICES"
+
+fail_closed_policy:
+  - "UNKNOWN state -> allowed_jurisdictions is always the empty set."
+  - "AMBIGUOUS state -> allowed_jurisdictions is always the empty set."
+  - "Missing jurisdiction on evidence -> blocked (JURISDICTION_METADATA_INVALID), never treated as INDIA."
+  - "Malformed/unrecognized jurisdiction on evidence -> blocked (JURISDICTION_METADATA_INVALID)."
+  - "A decision that is not KNOWN blocks ALL evidence, regardless of that evidence's own jurisdiction value (CORPUS_NOT_PERMITTED)."
+
+out_of_scope:
+  - "Legal determination of any kind (governing law, compliance, validity, patentability, infringement, regulatory approval)."
+  - "Currentness/effective-date determination - a separate source/versioning problem."
+  - "Country-level legal routing beyond INDIA/INTERNATIONAL/BOTH."
+  - "Geolocation, browser/system locale, timezone, or device-location-based inference."
+  - "Language-based jurisdiction inference - language is never jurisdiction."
+  - "Rewriting Phase 5-7 retrieval algorithms (BM25/dense/RRF/reranking)."
+  - "Confidence scoring, human escalation, translation (Phases 13-15)."
+
+safety_invariants:
+  - id: "JURISDICTION-SAFE-01"
+    rule: "allowed_jurisdictions is non-empty if and only if state == KNOWN - fail closed by construction, enforced at JurisdictionDecision construction time, never by convention alone."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "JURISDICTION-SAFE-02"
+    rule: "A request for INDIA never silently searches INTERNATIONAL evidence, and vice versa - no code path in src/jurisdiction/ falls back across jurisdictions."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "JURISDICTION-SAFE-03"
+    rule: "Evidence with missing, empty, or unrecognized jurisdiction metadata is always blocked, never guessed as INDIA or any other value."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "JURISDICTION-SAFE-04"
+    rule: "Conflicting jurisdiction signals (explicit override vs. classification result) resolve to AMBIGUOUS, never an arbitrary pick of one signal."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "JURISDICTION-SAFE-05"
+    rule: "filter_evidence structurally excludes incompatible evidence from its allowed_evidence output - it never merely attaches a warning to evidence that remains usable."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "JURISDICTION-SAFE-06"
+    rule: "Jurisdiction is never inferred from evidence_text content, language/script, geolocation, or locale - only from the structured request-side signal(s)."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "JURISDICTION-SAFE-07"
+    rule: "No jurisdiction determination performs a legal conclusion (governing law, compliance, validity, patentability, infringement, regulatory approval, or currentness)."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "JURISDICTION-SAFE-08"
+    rule: "decision_id is a deterministic SHA-256 hash of the decision's own canonical fields - never a random UUID, never derived from a timestamp."
+    source_label: "[ENGINEERING RECOMMENDATION]"

@@ -1,0 +1,90 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 8 machine-readable evidence/citation contract, mirroring
+# config/hybrid_retrieval_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_08_EVIDENCE_OBJECT_AND_CITATION_ARCHITECTURE.md
+# Implementation: src/evidence/builder.py, src/evidence/identity.py
+
+contract_version: "1.0.0"
+
+evidence_schema_version: "1.0.0"
+pack_schema_version: "1.0.0"
+
+evidence_types: ["CHUNK"]
+
+# Evidence identity is derived, never invented, never a FAISS/BM25 array
+# position, never a random UUID, never derived from LLM output.
+evidence_id_inputs:
+  ["evidence_schema_version", "chunk_id", "content_hash", "document_id", "source_family_id", "jurisdiction", "block_ids", "page_numbers"]
+
+pack_id_inputs: ["pack_schema_version", "query", "ordered_evidence_ids", "selection_config_signature"]
+
+accepted_candidate_types:
+  [
+    "retrieval.models.RetrievalResult",
+    "retrieval.models.DenseRetrievalResult",
+    "retrieval.models.RrfResult",
+    "retrieval.models.HybridRetrievalResult",
+  ]
+
+required_candidate_attributes:
+  ["chunk_id", "chunk_text", "document_id", "source_family_id", "jurisdiction", "content_hash", "synthetic", "page_numbers", "block_ids", "rank"]
+
+default_max_evidence_items: 10
+
+deduplication_policy: "FIRST_OCCURRENCE_BY_CHUNK_ID_WINS_WITHIN_ONE_PACK_CONSTRUCTION"
+
+ordering_policy: "ASCENDING_RANK_THEN_ASCENDING_CHUNK_ID"
+
+# [DEFERRED]/[ASSUMPTION] Phase 2's config/corpus_provenance_schema.yaml
+# defines version/effective_date/publication_date/supersession_status, but
+# none of these are currently carried forward by Phase 3 ExtractedDocument,
+# Phase 4 Chunk, or any Phase 5/6/7 retrieval result - so every
+# VersionInfo field is always null/false ("not available") for every
+# Evidence object this phase can produce. See docs Section T.
+version_info_availability: "NOT_AVAILABLE_IN_UPSTREAM_PROVENANCE_AS_OF_PHASE_8"
+
+# [DEFERRED]/[ASSUMPTION] no per-document source_url is carried forward by
+# any Phase 3-7 contract (Phase 2's own `source_reference` field is not
+# propagated past Phase 2) - so no Evidence object carries a document-level
+# source_url. Never constructed from a document name; never guessed.
+source_url_availability: "NOT_AVAILABLE_IN_UPSTREAM_PROVENANCE_AS_OF_PHASE_8"
+
+output_requirements:
+  - "evidence_text is verbatim candidate/chunk text - never paraphrased, summarized, or rewritten."
+  - "evidence_id is never used in place of chunk_id internally - chunk_id remains the underlying Phase 4 retrieval identity."
+  - "EvidencePack contains only real Evidence objects - never a generated answer, a generated claim, LLM reasoning, or a hallucinated citation."
+  - "A CitationTarget contains only an evidence_id and schema_version - no invented source data of its own."
+  - "synthetic must be propagated unchanged onto every Evidence object."
+  - "retrieval scores (bm25_score/dense_score/rrf_score/reranker_score) must never be represented as legal confidence, regulatory authority, or citation validity."
+
+determinism_requirements:
+  - "build_evidence_pack() candidate deduplication, filtering, and ordering does not depend on set/dict iteration order."
+  - "Running build_evidence_from_candidate()/build_evidence_pack() repeatedly on identical input produces identical evidence_id/pack_id and serialized JSON."
+
+safety_invariants:
+  - id: "EVIDENCE-SAFE-01"
+    rule: "Every Evidence object traces back to a real chunk_id, document_id, source_family_id, jurisdiction, content_hash, at least one page_number, and at least one block_id - evidence must never become a detached text fragment."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "EVIDENCE-SAFE-02"
+    rule: "evidence_id and pack_id are deterministic hashes of authoritative fields - never a random UUID, a FAISS/BM25 array position, a display name, or anything derived from LLM output."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SAFE-03"
+    rule: "The same underlying chunk_id, retrieved through BM25, dense, RRF, or reranking, always maps to exactly one Evidence identity within one EvidencePack construction - never multiple independent evidence objects."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SAFE-04"
+    rule: "evidence_text_hash tampering (evidence_text changed without updating the hash) is detected on verification/deserialization and raises EvidenceIntegrityError - never silently accepted."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SAFE-05"
+    rule: "A forged/hand-edited evidence_id or pack_id (not matching the identity recomputed from the object's own other fields) is detected on verification/deserialization and raises EvidenceIntegrityError."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SAFE-06"
+    rule: "A CitationTarget referencing an evidence_id not present in the given EvidencePack raises EvidenceNotFoundError - never silently resolved to a different/nearby evidence item."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SAFE-07"
+    rule: "Evidence text is treated strictly as data - it is never executed, never interpreted as instructions, and can never alter evidence ID generation, selection limits, schema, or filesystem paths."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SAFE-08"
+    rule: "No field is fabricated when unavailable from upstream provenance (version/effective-date/source_url) - such fields are explicitly null/false, never guessed or invented."
+    source_label: "[OFFICIAL SOURCE]"

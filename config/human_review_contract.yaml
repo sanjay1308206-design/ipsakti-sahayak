@@ -1,0 +1,146 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 15 machine-readable human-in-the-loop contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_15_HUMAN_IN_THE_LOOP.md
+# Implementation: src/review/models.py, policy.py, workflow.py, validation.py, serialize.py
+#
+# CRITICAL: this contract does NOT grant a reviewer authority over
+# evidence identity, citation validity, jurisdiction routing,
+# classification, grounding, or safety. It only defines WHEN a case is
+# escalated for review, WHAT a reviewer may structurally decide, and HOW
+# that decision is recorded as an independent, auditable fact.
+
+contract_version: "1.0.0"
+
+review_schema_version: "1.0.0"
+
+reused_contracts:
+  - "generation.models.GroundedResponse (Phase 10) - grounding_status, cited_evidence_ids, evidence_pack_id, synthetic, reused read-only, never recomputed."
+  - "classification.models.ClassificationResult (Phase 11) - classification_state, requires_escalation, formulation_classification.regulatory_track, evidence_state, reused read-only, never recomputed."
+  - "jurisdiction.models.JurisdictionDecision (Phase 12) - state, requires_escalation, reused read-only, never overridden."
+  - "safety.models.SafetyDecision (Phase 13) - safety_status, engineering_signal_band, synthetic, reused read-only, never overridden."
+  - "multilingual.models.MultilingualDeliveryResult (Phase 14) - delivery_status, requested_language, detected_script, reused read-only, never recomputed."
+  - "citation.models.CitationValidationResult (Phase 9) - status, reused read-only, never revalidated or re-derived here."
+  - "evidence.models.EvidencePack (Phase 8) - evidence_id membership only, used to reject a fabricated reviewer-selected evidence reference; never mutated."
+
+# Every trigger reason maps to a vocabulary value that ALREADY exists in
+# an earlier phase's own closed contract - no new regulatory-risk
+# category is invented here (docs Section E).
+trigger_reason_vocabulary:
+  [
+    "SAFETY_ESCALATE",
+    "SAFETY_ABSTAIN",
+    "CLASSIFICATION_AMBIGUOUS",
+    "CLASSIFICATION_UNRESOLVED",
+    "CLASSIFICATION_NEEDS_EVIDENCE",
+    "REGULATORY_TRACK_CONFLICTING",
+    "JURISDICTION_AMBIGUOUS",
+    "JURISDICTION_UNRESOLVED",
+    "CITATION_INTEGRITY_FAILURE",
+    "GROUNDING_FAILURE",
+    "MULTILINGUAL_DELIVERY_ISSUE",
+  ]
+
+# Fixed, documented mapping from each trigger reason to a source signal
+# already produced upstream - never a Phase-15-invented detection.
+trigger_reason_source_mapping:
+  SAFETY_ESCALATE: "safety.models.SafetyDecision.safety_status == ESCALATE (Phase 13)"
+  SAFETY_ABSTAIN: "safety.models.SafetyDecision.safety_status == ABSTAIN (Phase 13)"
+  CLASSIFICATION_AMBIGUOUS: "classification.models.ClassificationResult.classification_state == AMBIGUOUS, or requires_escalation (Phase 11)"
+  CLASSIFICATION_UNRESOLVED: "classification.models.ClassificationResult.classification_state == UNKNOWN (Phase 11)"
+  CLASSIFICATION_NEEDS_EVIDENCE: "classification.models.ClassificationResult.classification_state == NEEDS_EVIDENCE (Phase 11)"
+  REGULATORY_TRACK_CONFLICTING: "classification.models.FormulationClassificationValues.regulatory_track == CONFLICTING (Phase 1/11)"
+  JURISDICTION_AMBIGUOUS: "jurisdiction.models.JurisdictionDecision.state == AMBIGUOUS, or requires_escalation (Phase 12)"
+  JURISDICTION_UNRESOLVED: "jurisdiction.models.JurisdictionDecision.state == UNKNOWN (Phase 12)"
+  CITATION_INTEGRITY_FAILURE: "any citation.models.CitationValidationResult.status != VALID in the batch supplied (Phase 9)"
+  GROUNDING_FAILURE: "generation.models.GroundedResponse.grounding_status != GROUNDED (Phase 10)"
+  MULTILINGUAL_DELIVERY_ISSUE: "multilingual.models.MultilingualDeliveryResult.delivery_status in {TRANSLATION_FAILED, UNSUPPORTED_LANGUAGE} (Phase 14)"
+
+# CATEGORICAL priority only - never a numeric probability
+# (docs "NO NUMERIC CONFIDENCE INVENTION"). NOT_APPLICABLE is reachable
+# only when no trigger fired (no ReviewRequest exists in that case).
+priority_vocabulary: ["NORMAL", "HIGH", "CRITICAL", "NOT_APPLICABLE"]
+
+trigger_priority_mapping:
+  SAFETY_ESCALATE: "CRITICAL"
+  SAFETY_ABSTAIN: "HIGH"
+  CLASSIFICATION_AMBIGUOUS: "HIGH"
+  CLASSIFICATION_UNRESOLVED: "NORMAL"
+  CLASSIFICATION_NEEDS_EVIDENCE: "NORMAL"
+  REGULATORY_TRACK_CONFLICTING: "HIGH"
+  JURISDICTION_AMBIGUOUS: "HIGH"
+  JURISDICTION_UNRESOLVED: "NORMAL"
+  CITATION_INTEGRITY_FAILURE: "HIGH"
+  GROUNDING_FAILURE: "HIGH"
+  MULTILINGUAL_DELIVERY_ISSUE: "NORMAL"
+
+# Closed, smallest-justified finite-state workflow (docs Section G).
+review_status_vocabulary: ["PENDING", "IN_REVIEW", "APPROVED", "REJECTED", "NEEDS_MORE_EVIDENCE", "ESCALATED"]
+initial_review_status: "PENDING"
+terminal_review_statuses: ["APPROVED", "REJECTED", "NEEDS_MORE_EVIDENCE", "ESCALATED"]
+
+# Closed reviewer-decision vocabulary (docs Section H).
+review_action_vocabulary: ["START_REVIEW", "APPROVE", "REJECT", "REQUEST_MORE_EVIDENCE", "ESCALATE"]
+
+# The ENTIRE transition table - any (status, action) pair not listed here
+# is an invalid transition and fails explicitly.
+action_transition_table:
+  - {from: "PENDING", action: "START_REVIEW", to: "IN_REVIEW"}
+  - {from: "PENDING", action: "APPROVE", to: "APPROVED"}
+  - {from: "PENDING", action: "REJECT", to: "REJECTED"}
+  - {from: "PENDING", action: "REQUEST_MORE_EVIDENCE", to: "NEEDS_MORE_EVIDENCE"}
+  - {from: "PENDING", action: "ESCALATE", to: "ESCALATED"}
+  - {from: "IN_REVIEW", action: "APPROVE", to: "APPROVED"}
+  - {from: "IN_REVIEW", action: "REJECT", to: "REJECTED"}
+  - {from: "IN_REVIEW", action: "REQUEST_MORE_EVIDENCE", to: "NEEDS_MORE_EVIDENCE"}
+  - {from: "IN_REVIEW", action: "ESCALATE", to: "ESCALATED"}
+
+# "HUMAN REVIEW DECISION -> DELIVERY CONTROL" boundary (docs Section O).
+presentation_authorization_source_vocabulary: ["AUTOMATED_SAFE_TO_PRESENT", "HUMAN_REVIEW_APPROVED", "BLOCKED"]
+
+# [OUR ENHANCEMENT] a defensive, non-project-derived bound on free-text
+# reviewer comments - never an unbounded audit format (docs Section S).
+max_reviewer_comment_length: 10000
+
+# No wall-clock timestamp field exists anywhere in this contract -
+# consistent with every prior phase's own identity convention (never a
+# random UUID, never a timestamp). Ordering within one review request is
+# an explicit sequence_number ordinal, not a clock reading.
+ordering_policy: "EXPLICIT_SEQUENCE_NUMBER_ORDINAL_NO_WALL_CLOCK_TIMESTAMP_ANYWHERE"
+
+out_of_scope:
+  - "Real reviewer authentication/authorization - synthetic reviewer IDs only (Phase 17+/[DEFERRED])."
+  - "A reviewer dashboard, web page, or any frontend (Phase 18's own scope)."
+  - "FastAPI endpoints or any productization of this workflow (Phase 17's own scope)."
+  - "Multi-reviewer consensus semantics - concurrent reviews of the same case remain separate, unmerged records."
+  - "Reviewer feedback automatically updating the corpus, retraining a model, or modifying a rule."
+  - "Re-deriving classification, jurisdiction, citation validation, grounding, or safety - all remain their owning phase's exclusive authority."
+  - "The complete Phase 16 evaluation/red-team benchmark framework."
+  - "Project-wide adversarial security hardening (Phase 19's own scope)."
+
+safety_invariants:
+  - id: "REVIEW-SAFE-01"
+    rule: "A reviewer action never mutates original_query, any Evidence/EvidencePack object, any CitationValidationResult, any ClassificationResult, any JurisdictionDecision, any GroundedResponse, or any SafetyDecision - src/review/ never imports a constructor or mutator for any of those types, only their already-closed vocabularies for validation."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "REVIEW-SAFE-02"
+    rule: "A reviewer may only select evidence_id values that already exist in a real, supplied EvidencePack - a fabricated evidence_id is always rejected (FakeEvidenceReferenceError), never silently accepted."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "REVIEW-SAFE-03"
+    rule: "reviewer_comment is untrusted free text, stored verbatim, and is never parsed for citation markers, jurisdiction words, or status claims - it can never influence action, new_status, selected_evidence_ids, or any trusted field."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "REVIEW-SAFE-04"
+    rule: "An ABSTAIN or ESCALATE SafetyDecision is never silently converted to SAFE_TO_PRESENT - presentation after such a decision requires a real ReviewAction with action=APPROVE, and the resulting PresentationAuthorization always carries source=HUMAN_REVIEW_APPROVED plus the fixed, non-legal-certification disclaimer, never a rewritten safety_status."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "REVIEW-SAFE-05"
+    rule: "review_request_id and review_action_id are deterministic SHA-256 hashes of their own canonical fields - never a random UUID, never derived from a timestamp."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "REVIEW-SAFE-06"
+    rule: "An invalid (status, action) transition always raises InvalidReviewTransitionError - it is never silently normalized into the nearest valid transition."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "REVIEW-SAFE-07"
+    rule: "A terminal review_status (APPROVED/REJECTED/NEEDS_MORE_EVIDENCE/ESCALATED) accepts no further actions."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "REVIEW-SAFE-08"
+    rule: "No trigger reason is computed from evidence_text content, language/script, geolocation, or a numeric probability - every trigger reads one already-closed upstream status/state value only."
+    source_label: "[ENGINEERING RECOMMENDATION]"

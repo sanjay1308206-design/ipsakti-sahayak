@@ -1,0 +1,22 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 20 (Deployment Engineering) — Render Free backend build input ONLY.
+#
+# This file is DELIBERATELY SEPARATE from requirements-dev.txt (which is
+# never modified by this phase - docs/PHASE_20_DEPLOYMENT_ENGINEERING.md).
+# requirements-dev.txt bundles the full Phase 0-19 project-control/testing
+# footprint (pytest, PyYAML, pypdf, sentence-transformers, faiss-cpu,
+# numpy) alongside the three packages the deployed FastAPI app actually
+# imports. None of the Phase 6 dense-retrieval packages (sentence-
+# transformers/faiss-cpu/numpy/torch, transitively) or ingestion package
+# (pypdf) is imported anywhere by src/api/ or src/application/, or by any
+# Phase 8-15 module they call (each of those phases is stdlib-only per
+# its own dependency policy - see requirements-dev.txt's per-phase
+# comments) - installing them on a Render Free web service (0.1 CPU /
+# 512 MB RAM, [OFFICIAL SOURCE] https://render.com/docs/compute-plans)
+# would be slow, disk-heavy, and entirely unused at runtime.
+#
+# Exact same verified-working version ranges as requirements-dev.txt
+# (Phase 17's own AE section) - never a different, unverified pin.
+fastapi>=0.136,<0.137
+pydantic>=2,<3
+uvicorn>=0.42,<0.43

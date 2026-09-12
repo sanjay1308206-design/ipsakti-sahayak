@@ -1,0 +1,150 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 1 machine-readable classification result contract (output schema).
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_01_DOMAIN_TAXONOMY.md Section I
+#
+# This defines the SHAPE of a classification result. Phase 1 does not
+# produce real classification results from real user input (that is
+# Phase 11); this schema is what Phase 11 (and every phase downstream)
+# must conform to.
+
+contract_version: "1.0.0"
+
+description: >
+  Output schema for a regulatory/IP classification result. Mirrors the
+  Final Architecture Decision Lock's Classification principle: "Output
+  should be provisional classification, basis, missing information and
+  human-review status."
+
+fields:
+  - name: "input_id"
+    type: "string"
+    required: true
+    description: "Caller-supplied identifier for this classification request (opaque, for traceability/logging only)."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "user_intent"
+    type: "enum"
+    enum_ref: "user_intent_categories"
+    required: true
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "formulation_classification"
+    type: "object"
+    required: true
+    source_label: "[OFFICIAL SOURCE]"
+    fields:
+      - name: "regulatory_track"
+        type: "enum"
+        enum_ref: "regulatory_track"
+        required: true
+      - name: "ip_protection_category"
+        type: "enum"
+        enum_ref: "ip_protection_category"
+        required: true
+      - name: "abs_tk_relation"
+        type: "enum"
+        enum_ref: "abs_tk_relation"
+        required: true
+
+  - name: "regulatory_question_type"
+    type: "enum"
+    enum_ref: "regulatory_question_categories"
+    required: true
+    source_label: "[OFFICIAL SOURCE]"
+
+  - name: "jurisdiction_input"
+    type: "enum"
+    enum_ref: "jurisdiction_inputs"
+    required: true
+    source_label: "[OFFICIAL SOURCE]"
+
+  - name: "evidence_state"
+    type: "enum"
+    enum_ref: "evidence_states"
+    required: true
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "classification_state"
+    type: "enum"
+    enum_ref: "classification_states"
+    required: true
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "reason_codes"
+    type: "list[string]"
+    required: true
+    description: "Rule-derived reason codes explaining the classification_state (may be empty only when classification_state == KNOWN)."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "explanation"
+    type: "string"
+    required: true
+    description: "Non-empty, human-readable explanation of the result."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "requires_evidence"
+    type: "boolean"
+    required: true
+    description: "True iff classification_state == NEEDS_EVIDENCE."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "requires_escalation"
+    type: "boolean"
+    required: true
+    description: "True iff classification_state == AMBIGUOUS."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "basis"
+    type: "list[string]"
+    required: true
+    description: "Taxonomy/rule IDs consulted to produce this result (e.g. ['R7', 'RT-04', 'RQ-05']), for audit/traceability."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+
+  - name: "disclaimer"
+    type: "string"
+    required: true
+    constant: >
+      This classification is an engineering categorization used for
+      internal workflow routing only. It is not legal advice and is not
+      an authoritative legal determination. Consult the cited authoritative
+      source and, where applicable, a qualified professional before relying
+      on this result.
+    description: "Fixed disclaimer text. Must be present and identical on every result, regardless of classification_state."
+    source_label: "[OFFICIAL SOURCE]"
+
+  - name: "provenance"
+    type: "object"
+    required: true
+    source_label: "[ENGINEERING RECOMMENDATION]"
+    fields:
+      - name: "taxonomy_version"
+        type: "string"
+        required: true
+      - name: "decision_tree_version"
+        type: "string"
+        required: true
+      - name: "contract_version"
+        type: "string"
+        required: true
+
+safety_invariants:
+  - id: "SAFE-01"
+    rule: "disclaimer must be present, non-empty, and identical to the fixed constant for every classification result, regardless of classification_state."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "SAFE-02"
+    rule: "classification_state == KNOWN must never be interpreted as legal certainty; no field in this schema asserts legal validity or legal certainty."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "SAFE-03"
+    rule: "No field named or semantically equivalent to 'legally_certain', 'is_legally_valid', or 'legal_determination' may exist in this schema."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFE-04"
+    rule: "requires_evidence must be true whenever classification_state == NEEDS_EVIDENCE, and only then."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFE-05"
+    rule: "requires_escalation must be true whenever classification_state == AMBIGUOUS, and only then."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFE-06"
+    rule: "Every enum field's value must be a member of its enum_ref in config/domain_taxonomy.yaml; free-text values are never accepted for enum fields."
+    source_label: "[OFFICIAL SOURCE]"

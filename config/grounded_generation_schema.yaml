@@ -1,0 +1,112 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 10 machine-readable grounded-response/output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_10_GROUNDED_GENERATION.md
+#
+# This is the SHAPE produced by src/generation/serialize.py. It is not a
+# formulation-classification, jurisdiction, or confidence-engine schema
+# (Phases 11-13); it is Phase 10's deterministic grounded-generation
+# representation.
+
+schema_version: "1.0.0"
+
+generation_output:
+  description: "A provider's raw output. metadata may never contain a credential-shaped key."
+  fields:
+    - name: "raw_text"
+      type: "string"
+      required: true
+      description: "Verbatim provider text - never parsed for meaning here."
+    - name: "provider_name"
+      type: "string"
+      required: true
+    - name: "model_identifier"
+      type: "string"
+      required: true
+    - name: "success"
+      type: "boolean"
+      required: true
+    - name: "failure_reason"
+      type: "string_or_null"
+      required: true
+      description: "non-null if and only if success is false."
+    - name: "metadata"
+      type: "object"
+      required: true
+      description: "Opaque, provider-specific. Keys must never look credential-shaped (api_key/credential/secret/token/password substrings, case-insensitive)."
+
+grounded_response:
+  description: "The Phase 10 deliverable. Exactly one of GROUNDED/ABSTAINED/GENERATION_FAILED."
+  fields:
+    - name: "schema_version"
+      type: "string"
+      required: true
+    - name: "response_id"
+      type: "string"
+      required: true
+      description: "Deterministic SHA-256 hex digest over the response's own canonical fields - never a random UUID."
+    - name: "query"
+      type: "string"
+      required: true
+    - name: "canonical_query"
+      type: "string_or_null"
+      required: true
+    - name: "answer_text"
+      type: "string_or_null"
+      required: true
+      description: "non-null if and only if grounding_status is GROUNDED."
+    - name: "cited_evidence_ids"
+      type: "list[string]"
+      required: true
+      description: "Every entry already passed Phase 9 validation. Non-empty only when grounding_status is GROUNDED. No duplicates."
+    - name: "citation_validation_summary"
+      type: "citation_coverage_metrics"
+      required: true
+      description: "Phase 9's own CitationCoverageMetrics, reused unchanged - citation-integrity coverage only, never legal correctness."
+    - name: "grounding_status"
+      type: "enum"
+      enum_ref: "grounding_status_vocabulary"
+      required: true
+    - name: "abstained"
+      type: "boolean"
+      required: true
+      description: "true if and only if grounding_status is ABSTAINED."
+    - name: "abstention_reason"
+      type: "enum_or_null"
+      enum_ref: "abstention_reason_vocabulary"
+      required: true
+      description: "non-null if and only if grounding_status is ABSTAINED."
+    - name: "failure_reason"
+      type: "string_or_null"
+      required: true
+      description: "non-null if and only if grounding_status is GENERATION_FAILED."
+    - name: "provider_name"
+      type: "string"
+      required: true
+    - name: "model_identifier"
+      type: "string"
+      required: true
+    - name: "generation_metadata"
+      type: "object"
+      required: true
+      description: "Opaque orchestration metadata assembled by Phase 10 itself (e.g. evidence_item_count, citation_marker_count) - never sourced from an untrusted provider directly."
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+      description: "true if any Evidence item in the underlying EvidencePack is synthetic."
+    - name: "evidence_pack_id"
+      type: "string"
+      required: true
+      description: "Traceability back to the exact Phase 8 EvidencePack this response was generated from."
+
+grounding_status_vocabulary: ["GROUNDED", "ABSTAINED", "GENERATION_FAILED"]
+abstention_reason_vocabulary: ["NO_EVIDENCE_AVAILABLE", "NO_VALID_CITATIONS_PRODUCED"]
+
+safety_invariants:
+  - id: "GENERATION-SCHEMA-SAFE-01"
+    rule: "answer_text, abstention_reason, and failure_reason presence are each tied to exactly one grounding_status value - enforced at construction and re-enforced on deserialization."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SCHEMA-SAFE-02"
+    rule: "grounded_response deserialization performs full explicit field reconstruction (including the nested citation_validation_summary via Phase 9's own deserializer) and rejects any missing/malformed field - never a silently-repaired partial object."
+    source_label: "[ENGINEERING RECOMMENDATION]"

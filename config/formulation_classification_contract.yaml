@@ -1,0 +1,94 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 11 machine-readable formulation-classification-engine contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_11_FORMULATION_CLASSIFICATION.md
+# Implementation: src/classification/classifier.py, rules.py, models.py
+#
+# CRITICAL: this contract does NOT define a second taxonomy. Every enum
+# value named below is defined once, in config/domain_taxonomy.yaml, and
+# every combination rule is defined once, in
+# config/regulatory_decision_tree.yaml. This file only documents Phase
+# 11's OWN addition: how raw/structured input is mapped onto those
+# already-fixed values, and the additional per-dimension explainability
+# structure Phase 11 exposes beyond config/classification_contract.yaml.
+
+contract_version: "1.0.0"
+
+classification_schema_version: "1.0.0"
+
+reused_phase_1_contracts:
+  - "config/domain_taxonomy.yaml (taxonomy_version 1.0.0) - every enum value, unchanged."
+  - "config/regulatory_decision_tree.yaml (tree_version 1.0.0) - every rule (R1-R8), unchanged in order and semantics."
+  - "config/classification_contract.yaml (contract_version 1.0.0) - the output schema Phase 11 must conform to."
+
+# Phase 11's own input shape - deliberately minimal (docs Section G).
+# Only two free-text fields, both explicitly named in the Phase 11
+# instructions' "Possible Inputs" list - no speculative
+# ingredients/dosage-form/manufacturing/market schema.
+input_fields:
+  - name: "input_id"
+    type: "string"
+    required: true
+  - name: "raw_query"
+    type: "string"
+    required: true
+    description: "The user's question, verbatim. May be empty - never rejected, handled as 'no signal'."
+  - name: "formulation_description"
+    type: "string_or_null"
+    required: false
+    description: "Free text about the formulation/product, verbatim."
+  - name: "evidence_state"
+    type: "string_or_null"
+    required: false
+    description: "OPAQUE passthrough only - one of evidence_states in domain_taxonomy.yaml, or null. Phase 11 never computes this itself; it is assumed to have been determined upstream by a future orchestrator that already ran the Phase 5-9 evidence pipeline. An unrecognized value is treated identically to null (NOT_YET_EVALUATED), never guessed as SUFFICIENT_EVIDENCE."
+
+# Extraction is deliberately literal/narrow keyword matching over
+# lowercased (raw_query + formulation_description) - never an inference
+# of legal criteria from a product name, ingredient list, or general
+# knowledge (docs Section P). `[OUR ENHANCEMENT]` - not established by
+# the Master Reference, which names the category vocabulary but never
+# the extraction criteria.
+extraction_policy: "LITERAL_KEYWORD_MATCH_ONLY_ZERO_MATCHES_RESOLVES_TO_UNDETERMINED_MULTIPLE_MATCHES_RESOLVES_TO_CONFLICTING_OR_UNDETERMINED_NEVER_ARBITRARY_PICK"
+
+# Dimensions with NO CONFLICTING/AMBIGUOUS state of their own in
+# domain_taxonomy.yaml resolve multiple simultaneous keyword matches to
+# that dimension's own UNDETERMINED value - never an invented new state,
+# never an arbitrarily-chosen match.
+dimensions_without_own_conflict_state: ["ip_protection_category", "abs_tk_relation", "regulatory_question_type"]
+
+# Category values this Phase 11 extractor can NEVER produce, and why -
+# honestly disclosed rather than silently absent (docs Section W/X).
+unreachable_extractor_outputs:
+  - value: "IP-05 NONE"
+    reason: "Asserting 'definitely not IP-related' from the absence of a keyword would itself be an unjustified inference."
+  - value: "ATK-03 NOT_RELATED"
+    reason: "Same reasoning as IP-05 NONE."
+  - value: "UI-06 OUT_OF_SCOPE_OR_UNSUPPORTED"
+    reason: "Same reasoning as IP-05 NONE - a negative/out-of-scope claim is never asserted from mere silence."
+
+# Phase 11's OWN addition beyond config/classification_contract.yaml -
+# per-dimension explainability (docs Section K). Reuses the SAME closed
+# state vocabulary as classification_state, minus NEEDS_EVIDENCE (which
+# is a property of the overall tree only, never of one extraction step).
+dimension_detail_states: ["KNOWN", "UNKNOWN", "AMBIGUOUS"]
+
+safety_invariants:
+  - id: "CLASSIFY-SAFE-01"
+    rule: "Phase 11 never invents a taxonomy category, rule, or state beyond what config/domain_taxonomy.yaml and config/regulatory_decision_tree.yaml already define."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "CLASSIFY-SAFE-02"
+    rule: "Phase 11 never forces a value into a resolved category when the input supports zero or multiple candidates - it returns UNDETERMINED/CONFLICTING/AMBIGUOUS_INTENT instead."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CLASSIFY-SAFE-03"
+    rule: "Phase 11 never performs jurisdiction firewall routing, confidence scoring, translation, or human escalation - those remain Phase 12/13/14/15's own scope."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CLASSIFY-SAFE-04"
+    rule: "Phase 11 never retrieves evidence itself (no corpus query, no web search, no external API call) - evidence_state is an opaque passthrough input only."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CLASSIFY-SAFE-05"
+    rule: "Classification never requires an LLM, embeddings, FAISS, or network access - it is 100% deterministic, stdlib-only."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "CLASSIFY-SAFE-06"
+    rule: "User-supplied text is always treated as inert data - it is matched against fixed keyword tables only, never executed, never eval'd."
+    source_label: "[ENGINEERING RECOMMENDATION]"

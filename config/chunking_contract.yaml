@@ -1,0 +1,68 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 4 machine-readable chunking contract (pipeline states + config
+# semantics), mirroring config/document_ingestion_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_04_LEGAL_AWARE_CHUNKING.md
+# Implementation: src/chunking/chunker.py
+
+contract_version: "1.0.0"
+
+# Engineering pipeline states for the chunking step itself - not legal
+# classifications, and distinct from ingestion.models.PIPELINE_STATES.
+chunking_states:
+  - "CHUNKING_SUCCESS"
+  - "CHUNKING_PARTIAL"
+  - "CHUNKING_SKIPPED"
+
+# The only accepted input to chunk_document(): a Phase 3 ExtractedDocument.
+# Phase 4 never accepts raw bytes, a file path, or a serialized JSON dict -
+# it consumes the actual in-memory Phase 3 output object.
+accepted_input_type: "ingestion.models.ExtractedDocument"
+
+size_unit: "UNICODE_CODE_POINTS"  # [ENGINEERING RECOMMENDATION] see docs Section G - no tokenizer dependency added
+
+default_max_chunk_size_chars: 1000  # [ENGINEERING RECOMMENDATION] configurable via ChunkingConfig, not hard-coded
+
+chunk_warning_codes:
+  - "CHUNK_TEXT_EMPTY"
+  - "BLOCK_SPLIT_DUE_TO_SIZE"
+  - "TABLE_SPLIT_ACROSS_CHUNKS"
+  - "TABLE_ROW_EXCEEDS_MAX_SIZE"
+  - "TABLE_STRUCTURE_SIMPLIFIED"  # propagated verbatim from a Phase 3 TABLE block, never re-derived
+
+document_warning_codes:
+  - "NO_BLOCKS_TO_CHUNK"
+
+output_requirements:
+  - "Output must conform to config/chunk_schema.yaml."
+  - "Output must be deterministic JSON (sort_keys, fixed separators, UTF-8) for identical Phase 3 input + identical ChunkingConfig."
+  - "Output must never embed a wall-clock chunking timestamp inside the deterministic content payload."
+  - "Output must propagate the input document's synthetic flag unchanged onto every chunk."
+  - "chunk_id must never be represented as, or accepted as, a legal citation (Phase 8 owns citation architecture)."
+
+warning_requirements:
+  - "Every size-driven split (block or table) must be recorded as an explicit warning code, never silently performed."
+  - "A chunk composed only of empty/whitespace-only blocks (e.g. a lone HTML LIST marker) must carry CHUNK_TEXT_EMPTY, never be indistinguishable from a chunk with real content."
+
+determinism_requirements:
+  - "chunk_id is derived by hashing document_id + content_hash + chunking-config signature + ordered contributing block_ids + split_index - never a random UUID, timestamp, or process/machine state."
+  - "chunk_sequence is assigned in document reading order (the same order Phase 3's block `sequence` already establishes) and is identical across repeated runs on identical input."
+  - "Running chunk_document() twice on the same ExtractedDocument with the same ChunkingConfig must produce identical chunk count, ordering, IDs, text, and serialized JSON."
+
+safety_invariants:
+  - id: "CHUNK-SAFE-01"
+    rule: "Every chunk traces back to at least one Phase 3 block_id, at least one page_number, and the document's document_id/source_family_id/jurisdiction/content_hash - a chunk must never become an orphaned text fragment."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "CHUNK-SAFE-02"
+    rule: "The synthetic flag on every chunk must equal the source document's synthetic flag, unchanged, never silently dropped or flipped."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CHUNK-SAFE-03"
+    rule: "A block whose text exceeds the configured max_chunk_size_chars is split by exact, non-overlapping, whitespace-preferring slices such that concatenating all split pieces (in split_index order) reproduces the original block text exactly - no character is ever lost or duplicated."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CHUNK-SAFE-04"
+    rule: "No structural or legal hierarchy is invented: section_heading_* fields are populated only from a heading Phase 3 actually detected; a section with no detected heading carries section_heading_block_id=null, never a fabricated heading."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CHUNK-SAFE-05"
+    rule: "chunk_document() never raises an uncaught exception for a well-formed ExtractedDocument and a valid ChunkingConfig; malformed input (wrong type, invalid block objects) or invalid configuration raise a documented, typed exception (TypeError/ValueError) rather than crashing obscurely or silently producing corrupt output."
+    source_label: "[ENGINEERING RECOMMENDATION]"

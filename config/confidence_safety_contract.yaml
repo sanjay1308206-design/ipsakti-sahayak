@@ -1,0 +1,101 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 13 machine-readable confidence/safety/abstention contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_13_CONFIDENCE_SAFETY_ABSTENTION.md
+# Implementation: src/safety/evaluator.py, policy.py, models.py
+#
+# CRITICAL: this contract does NOT establish a legal-confidence scale, a
+# regulatory-risk threshold, or any calibrated probability. Every
+# threshold below is an [ASSUMPTION] engineering heuristic - see Section
+# K of the companion document for the full disclosure of why each value
+# was chosen and what evidence does NOT support it.
+
+contract_version: "1.0.0"
+
+safety_schema_version: "1.0.0"
+
+reused_contracts:
+  - "classification.models.ClassificationResult (Phase 11) - classification_state, requires_escalation, reused read-only."
+  - "jurisdiction.models.JurisdictionDecision (Phase 12) - state, requires_escalation, reused read-only."
+  - "generation.models.GroundedResponse (Phase 10) - grounding_status, cited_evidence_ids, citation_validation_summary, synthetic, reused read-only."
+  - "citation.metrics.CitationCoverageMetrics (Phase 9, carried forward inside GroundedResponse) - unique_valid_evidence_id_count, citation_integrity_validation_rate, reused verbatim, never recomputed."
+
+# Closed decision vocabulary (docs Section F).
+safety_status_vocabulary: ["SAFE_TO_PRESENT", "ABSTAIN", "ESCALATE"]
+
+# Closed, every member independently reachable and tested.
+reason_code_vocabulary:
+  [
+    "CLASSIFICATION_AMBIGUOUS",
+    "CLASSIFICATION_UNRESOLVED",
+    "JURISDICTION_AMBIGUOUS",
+    "JURISDICTION_UNRESOLVED",
+    "MISSING_GROUNDED_RESPONSE",
+    "GENERATION_FAILED",
+    "GENERATION_ABSTAINED",
+    "NO_VALID_CITATIONS",
+    "SAFE_GROUNDED_RESPONSE",
+  ]
+
+# A CATEGORICAL engineering signal, never a numeric probability (docs
+# Section J) - "prefer a categorical trust/safety assessment" over a
+# fabricated calibrated score.
+engineering_signal_band_vocabulary: ["STRONG", "MODERATE", "WEAK", "NOT_APPLICABLE"]
+
+# HARD SAFETY GATES - deterministic, ordered, first-match-wins (docs
+# Section H). Every gate is checked to completion BEFORE the optional
+# engineering signal is even computed - no gate can be overridden by it.
+hard_gate_order:
+  - {id: "G1", name: "CLASSIFICATION_AMBIGUOUS", result: "ESCALATE"}
+  - {id: "G2", name: "CLASSIFICATION_UNRESOLVED", result: "ABSTAIN"}
+  - {id: "G3", name: "JURISDICTION_AMBIGUOUS", result: "ESCALATE"}
+  - {id: "G4", name: "JURISDICTION_UNRESOLVED", result: "ABSTAIN"}
+  - {id: "G5", name: "MISSING_GROUNDED_RESPONSE", result: "ABSTAIN"}
+  - {id: "G6", name: "GENERATION_FAILED", result: "ABSTAIN"}
+  - {id: "G7", name: "GENERATION_ABSTAINED", result: "ABSTAIN"}
+  - {id: "G8", name: "NO_VALID_CITATIONS", result: "ABSTAIN"}
+  - {id: "G9", name: "DEFAULT_SAFE", result: "SAFE_TO_PRESENT"}
+
+# [ASSUMPTION] - see docs Section K for the full disclosure. No project
+# source establishes these numbers; they are disclosed, configurable
+# engineering heuristics, never a calibrated or legally-derived scale.
+default_policy_configuration:
+  require_at_least_one_valid_citation: true
+  strong_min_unique_citations: 2
+  strong_min_integrity_rate: 1.0
+  moderate_min_integrity_rate: 0.5
+
+out_of_scope:
+  - "Legal correctness, legal advice, or any legal-outcome probability (patentability, infringement, regulatory approval, compliance)."
+  - "Semantic claim/evidence entailment (NLI, embedding-similarity judge, LLM-as-judge) - [DEFERRED]."
+  - "Retrieval-quality scores (BM25/dense/RRF/reranker) as a component of the engineering signal - never combined here."
+  - "Human-in-the-loop workflow, reviewer queues, case assignment, notifications (Phase 15's own scope) - Phase 13 emits escalation_required only."
+  - "Translation / multilingual delivery (Phase 14)."
+  - "Re-implementing classification, jurisdiction routing, citation validation, or generation."
+
+safety_invariants:
+  - id: "SAFETY-SAFE-01"
+    rule: "engineering_signal_band is NOT_APPLICABLE unless safety_status == SAFE_TO_PRESENT - no engineering signal is computed for a response that was not presented."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFETY-SAFE-02"
+    rule: "A hard gate (G1-G8) that fires always produces ABSTAIN or ESCALATE - it can never be overridden by a subsequently-computed engineering signal, because the signal is computed only after every gate has already passed (G9)."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFETY-SAFE-03"
+    rule: "GENERATION_FAILED and GENERATION_ABSTAINED (Phase 10's own statuses) can never become SAFE_TO_PRESENT."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "SAFETY-SAFE-04"
+    rule: "A JurisdictionDecision that is AMBIGUOUS or UNKNOWN (or missing entirely) can never become SAFE_TO_PRESENT - Phase 12's own firewall decision is never overridden."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFETY-SAFE-05"
+    rule: "A ClassificationResult that is AMBIGUOUS or UNKNOWN (or missing entirely) can never become SAFE_TO_PRESENT - Phase 11's own uncertainty is never silently converted to certainty."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFETY-SAFE-06"
+    rule: "No field in this contract or its implementation asserts legal correctness, legal advice, patentability, infringement, regulatory approval, or legal compliance."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "SAFETY-SAFE-07"
+    rule: "synthetic is passed through from GroundedResponse.synthetic unchanged (None when unavailable) - never defaulted to false, never used to increase the engineering signal."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "SAFETY-SAFE-08"
+    rule: "decision_id is a deterministic SHA-256 hash of the decision's own canonical fields - never a random UUID, never derived from a timestamp."
+    source_label: "[ENGINEERING RECOMMENDATION]"

@@ -1,0 +1,108 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 2 CORPUS LOCK — the explicit, binding corpus policy for this
+# project. This is a governance artifact, not the corpus itself: no
+# document has been downloaded, scraped, or ingested as a result of
+# creating this file.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companions: docs/PHASE_02_AUTHORITY_MATRIX.md,
+#   docs/PHASE_02_CORPUS_ADMISSION_POLICY.md,
+#   docs/PHASE_02_SOURCE_CONFLICT_POLICY.md
+
+lock_version: "1.0.0"
+
+# Evidence-contributing source families only (excludes SF-08 Bhashini,
+# which is a service adapter, per docs/PHASE_02_AUTHORITY_MATRIX.md
+# Section 5).
+permitted_source_families:
+  - "SF-01"  # India Code
+  - "SF-02"  # IP India
+  - "SF-03"  # Ministry of Ayush
+  - "SF-04"  # CDSCO / Drugs & Cosmetics
+  - "SF-05"  # FSSAI
+  - "SF-06"  # WIPO / WIPO Lex
+  - "SF-07"  # TKDL (restricted - authorized/public material only)
+
+registered_service_adapters:
+  - "SF-08"  # Bhashini - registered, but never a corpus/evidence source
+
+permitted_jurisdictions:
+  - "INDIA"
+  - "INTERNATIONAL"
+# Note: OTHER_UNSPECIFIED is a valid classification value (see
+# config/authority_matrix.yaml valid_jurisdictions) but is never
+# "permitted" for ADMIT - a document with unspecified jurisdiction can
+# reach at best HOLD_FOR_VALIDATION.
+
+prohibited_source_classes:
+  - id: "PSC-01"
+    name: "SEARCH_ENGINE"
+    description: "A search engine used as a primary evidentiary source rather than a discovery tool pointing to a registered source family."
+  - id: "PSC-02"
+    name: "BLOG_OR_COMMERCIAL_LEGAL_SITE"
+    description: "Blogs and commercial legal-advice websites."
+  - id: "PSC-03"
+    name: "ENCYCLOPEDIA_OR_WIKI"
+    description: "Wikipedia and other general/crowd-sourced encyclopedias."
+  - id: "PSC-04"
+    name: "SOCIAL_MEDIA"
+    description: "Any social media platform or post."
+  - id: "PSC-05"
+    name: "UNVETTED_WEBPAGE"
+    description: "Any arbitrary webpage not traceable to a registered source family, including government-hosted pages not already named in config/authority_matrix.yaml."
+  - id: "PSC-06"
+    name: "UNREGISTERED_SOURCE_FAMILY"
+    description: "Any source family not present in config/authority_matrix.yaml source_families."
+
+admission_states:
+  - "ADMIT"
+  - "ADMIT_WITH_RESTRICTION"
+  - "HOLD_FOR_VALIDATION"
+  - "REJECT"
+  - "SUPERSEDED"
+
+required_provenance_fields:
+  # Mirrors the "required: true" fields of config/corpus_provenance_schema.yaml
+  - "document_id"
+  - "source_family_id"
+  - "source_reference"
+  - "jurisdiction"
+  - "title"
+  - "document_type"
+  - "effective_date_known"
+  - "version_known"
+  - "retrieved_at"
+  - "content_hash"
+  - "provenance_status"
+  - "validation_status"
+  - "supersession_status"
+  - "synthetic"
+
+required_validation_states:
+  - "UNVALIDATED"
+  - "VALIDATED"
+  - "VALIDATION_FAILED"
+
+conflict_policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+versioning_policy_reference: "docs/PHASE_02_CORPUS_ADMISSION_POLICY.md"
+
+retrieval_boundary_requirement: >
+  India-jurisdiction and international-jurisdiction evidence must never be
+  merged into one retrieval index or collection. Phase 2 guarantees the
+  jurisdiction metadata required to enforce this; actual retrieval-time
+  index separation and cross-jurisdiction leakage testing is owned by
+  Phase 12 (Jurisdiction Firewall), per config/acceptance_contract.yaml
+  CAP-12.
+
+expansion_policy: >
+  No new source family may be added to config/authority_matrix.yaml or
+  this file's permitted_source_families/registered_service_adapters
+  without an explicit, reviewed update that bumps both
+  authority_matrix_version and lock_version. No ingestion code, script,
+  or future phase may silently register a new source family, add a new
+  prohibited-class exemption, or widen permitted_jurisdictions. A source
+  family's mere existence, government hosting, or apparent usefulness is
+  never sufficient justification on its own - it must be traceable to the
+  Master Reference (or a subsequent explicitly-approved project decision
+  recorded with the same source-discipline labeling this project uses
+  throughout).

@@ -1,0 +1,174 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 7 machine-readable RRF/hybrid retrieval result output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_07_HYBRID_FUSION_AND_RERANKING.md
+#
+# This is the SHAPE produced by src/retrieval/serialize.rrf_response_to_json
+# and hybrid_response_to_json. It is not a citation/evidence schema
+# (Phase 8+); it is Phase 7's deterministic rank-fusion and reranking
+# result representation.
+
+schema_version: "1.0.0"
+
+rrf_response:
+  description: "Top-level result of rrf.fuse_rrf() - the candidate union already RRF-ranked, truncated to candidate_k."
+  fields:
+    - name: "query"
+      type: "string"
+      required: true
+    - name: "candidate_k"
+      type: "integer"
+      required: true
+    - name: "rrf_k"
+      type: "number"
+      required: true
+    - name: "results"
+      type: "list[rrf_result]"
+      required: true
+
+rrf_result:
+  description: "One RRF-fused candidate. rrf_score is a rank-fusion signal ONLY - never legal confidence, regulatory authority, citation validity, or factual correctness."
+  fields:
+    - name: "rank"
+      type: "integer"
+      required: true
+    - name: "chunk_id"
+      type: "string"
+      required: true
+    - name: "rrf_score"
+      type: "number"
+      required: true
+    - name: "bm25_rank"
+      type: "integer_or_null"
+      required: true
+      description: "Null when this candidate was not present in the BM25 result list."
+    - name: "bm25_score"
+      type: "number_or_null"
+      required: true
+    - name: "dense_rank"
+      type: "integer_or_null"
+      required: true
+      description: "Null when this candidate was not present in the dense result list."
+    - name: "dense_score"
+      type: "number_or_null"
+      required: true
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+    - name: "content_hash"
+      type: "string"
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+    - name: "page_numbers"
+      type: "list[integer]"
+      required: true
+    - name: "block_ids"
+      type: "list[string]"
+      required: true
+    - name: "chunk_text"
+      type: "string"
+      required: true
+
+hybrid_retrieval_response:
+  description: "Top-level result of hybrid.rerank_candidates() / hybrid.run_hybrid_pipeline() - the final Phase 7 output."
+  fields:
+    - name: "query"
+      type: "string"
+      required: true
+    - name: "top_k"
+      type: "integer"
+      required: true
+    - name: "rrf_k"
+      type: "number"
+      required: true
+    - name: "reranker_model_identity"
+      type: "string"
+      required: true
+    - name: "results"
+      type: "list[hybrid_retrieval_result]"
+      required: true
+
+hybrid_retrieval_result:
+  description: "One final result after cross-encoder reranking. bm25_score/dense_score/rrf_score/reranker_score are distinct fields, never collapsed - none is legal authority, citation validity, regulatory correctness, or confidence in a legal conclusion."
+  fields:
+    - name: "rank"
+      type: "integer"
+      required: true
+      description: "1-based final position, by descending reranker_score."
+    - name: "chunk_id"
+      type: "string"
+      required: true
+      description: "The originating Phase 4 chunk_id, unchanged - never a FAISS/BM25 internal position."
+    - name: "reranker_score"
+      type: "number"
+      required: true
+      description: "Cross-encoder relevance signal ONLY."
+    - name: "rrf_score"
+      type: "number"
+      required: true
+      description: "Rank-fusion signal ONLY, carried through from the RRF stage unchanged."
+    - name: "bm25_rank"
+      type: "integer_or_null"
+      required: true
+    - name: "bm25_score"
+      type: "number_or_null"
+      required: true
+      description: "Lexical relevance signal ONLY, carried through unchanged."
+    - name: "dense_rank"
+      type: "integer_or_null"
+      required: true
+    - name: "dense_score"
+      type: "number_or_null"
+      required: true
+      description: "Dense semantic similarity signal ONLY, carried through unchanged."
+    - name: "reranker_model_identity"
+      type: "string"
+      required: true
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+      description: "Preserved unchanged - never inferred from any score."
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+      description: "Preserved unchanged. Phase 7 does NOT implement the jurisdiction firewall (Phase 12 owns it) - passthrough metadata only."
+    - name: "content_hash"
+      type: "string"
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+    - name: "page_numbers"
+      type: "list[integer]"
+      required: true
+    - name: "block_ids"
+      type: "list[string]"
+      required: true
+      description: "Never empty - a hybrid result must always trace back to at least one Phase 3 block."
+    - name: "chunk_text"
+      type: "string"
+      required: true
+      description: "Verbatim copy of the originating chunk's text. Never summarized, paraphrased, or rewritten by fusion or reranking."
+
+safety_invariants:
+  - id: "HYBRID-SCHEMA-SAFE-01"
+    rule: "block_ids is never an empty list; every RRF/hybrid result traces back to at least one Phase 3 block."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "HYBRID-SCHEMA-SAFE-02"
+    rule: "chunk_id is always the real Phase 4 chunk_id - never a FAISS internal position, BM25 internal position, or generated display name."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "HYBRID-SCHEMA-SAFE-03"
+    rule: "bm25_score, dense_score, rrf_score, and reranker_score are four distinct fields, each documented separately - none is ever presented as legal authority, citation validity, regulatory correctness, or confidence in a legal conclusion."
+    source_label: "[ENGINEERING RECOMMENDATION]"

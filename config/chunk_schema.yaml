@@ -1,0 +1,135 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 4 machine-readable chunk output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_04_LEGAL_AWARE_CHUNKING.md
+#
+# This is the SHAPE produced by src/chunking/serialize.to_json. It is not a
+# retrieval/index schema (Phase 5+); it is Phase 4's deterministic,
+# provenance-preserving retrieval-ready chunk representation.
+
+schema_version: "1.0.0"
+
+chunking_states: ["CHUNKING_SUCCESS", "CHUNKING_PARTIAL", "CHUNKING_SKIPPED"]
+
+size_units: ["UNICODE_CODE_POINTS"]
+
+chunking_result:
+  description: "Top-level normalized chunking output for one document."
+  fields:
+    - name: "document_id"
+      type: "string"
+      required: true
+      description: "Copied unchanged from the Phase 3 ExtractedDocument; never invented."
+    - name: "chunking_status"
+      type: "enum"
+      enum_ref: "chunking_states"
+      required: true
+    - name: "config_signature"
+      type: "string"
+      required: true
+      description: "Canonical string identity of the ChunkingConfig used - part of chunk_id derivation."
+    - name: "chunks"
+      type: "list[chunk]"
+      required: true
+    - name: "warnings"
+      type: "list[string]"
+      required: true
+
+chunk:
+  description: "One retrieval-ready unit, in document reading order."
+  fields:
+    - name: "chunk_id"
+      type: "string"
+      required: true
+      description: "Deterministic SHA-256 hex digest. An engineering identifier only - MUST NOT be presented as, or accepted as, a legal citation (Phase 8 owns citation architecture)."
+    - name: "chunk_sequence"
+      type: "integer"
+      required: true
+      description: "Monotonically increasing within the document; establishes chunk ordering."
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+    - name: "content_hash"
+      type: "string"
+      required: true
+      description: "The document's own integrity.claimed_content_hash (Phase 3 already verified claimed==computed before a document could exist)."
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+      description: "Propagated verbatim from the Phase 3 ExtractedDocument.synthetic (config/corpus_provenance_schema.yaml PROV-SAFE-01/05)."
+    - name: "text"
+      type: "string"
+      required: true
+      description: "Verbatim contributing block text joined by a fixed separator (or a flattened table rendering for TABLE chunks); never summarized, paraphrased, or rewritten."
+    - name: "text_size"
+      type: "integer"
+      required: true
+      description: "len(text) in the unit named by size_unit."
+    - name: "size_unit"
+      type: "enum"
+      enum_ref: "size_units"
+      required: true
+    - name: "page_numbers"
+      type: "list[integer]"
+      required: true
+      description: "Sorted, de-duplicated page numbers of every contributing Phase 3 block."
+    - name: "block_ids"
+      type: "list[string]"
+      required: true
+      description: "Contributing Phase 3 block_id values, in document order. Never empty - a chunk must never be an orphaned text fragment."
+    - name: "block_types"
+      type: "list[string]"
+      required: true
+      description: "block_type of each entry in block_ids, same order and length."
+    - name: "section_heading_block_id"
+      type: "string_or_null"
+      required: false
+      description: "block_id of the section's governing HEADING block, when Phase 3 detected one; null for a preamble section with no detected heading."
+    - name: "section_heading_text"
+      type: "string_or_null"
+      required: false
+      description: "Context metadata only - a copy of the governing heading's text for navigational purposes. Distinct from `text`: the heading block's own text appears in `text` exactly once, in whichever chunk actually contains that block."
+    - name: "section_heading_level"
+      type: "integer_or_unknown_or_null"
+      required: false
+    - name: "list_group_id"
+      type: "string_or_null"
+      required: false
+      description: "block_id of the nearest preceding LIST marker block among this chunk's contributing blocks, when any LIST_ITEM contributed; null otherwise. A derived identity - Phase 3 does not assign one directly."
+    - name: "is_split"
+      type: "boolean"
+      required: true
+      description: "True when this chunk is one of several pieces produced by splitting a single oversized Phase 3 block (or table) - see split_index/split_count."
+    - name: "split_index"
+      type: "integer"
+      required: true
+      description: "0-based position of this piece among its split siblings; 0 when is_split is false."
+    - name: "split_count"
+      type: "integer"
+      required: true
+      description: "Total number of sibling pieces; 1 when is_split is false."
+    - name: "table_rows"
+      type: "list[list[string]]_or_null"
+      required: false
+      description: "Present only for a chunk wrapping a Phase 3 TABLE block: the original structured rows (or row-subset, if split), preserved unchanged alongside the flattened `text` rendering."
+    - name: "warnings"
+      type: "list[string]"
+      required: true
+
+safety_invariants:
+  - id: "CHUNK-SCHEMA-SAFE-01"
+    rule: "block_ids is never an empty list; every chunk traces back to at least one Phase 3 block."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "CHUNK-SCHEMA-SAFE-02"
+    rule: "chunk_id is never a random UUID, timestamp, or environment-derived value - it is a deterministic hash of canonical identity fields."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CHUNK-SCHEMA-SAFE-03"
+    rule: "section_heading_text is descriptive metadata, never treated as, or mixed indistinguishably into, the chunk's verbatim `text` field."
+    source_label: "[ENGINEERING RECOMMENDATION]"

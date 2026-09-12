@@ -1,0 +1,89 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 5 machine-readable retrieval result output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_05_BM25_BASELINE.md
+#
+# This is the SHAPE produced by src/retrieval/serialize.response_to_json. It
+# is not a citation/evidence schema (Phase 8+); it is Phase 5's deterministic
+# BM25 retrieval-result representation.
+
+schema_version: "1.0.0"
+
+retrieval_response:
+  description: "Top-level result of one query() call against a Bm25Index."
+  fields:
+    - name: "query"
+      type: "string"
+      required: true
+      description: "The original, unmodified query string as supplied by the caller."
+    - name: "normalized_query_tokens"
+      type: "list[string]"
+      required: true
+      description: "The tokenized/normalized query terms actually used for scoring (docs/PHASE_05_BM25_BASELINE.md Section C/D)."
+    - name: "top_k"
+      type: "integer"
+      required: true
+    - name: "index_signature"
+      type: "string"
+      required: true
+      description: "The Bm25Index this response was produced against - ties a result set to an exact corpus + parameter identity."
+    - name: "results"
+      type: "list[retrieval_result]"
+      required: true
+
+retrieval_result:
+  description: "One ranked chunk. score is a BM25 lexical relevance score ONLY - never legal authority, never a citation."
+  fields:
+    - name: "rank"
+      type: "integer"
+      required: true
+      description: "1-based position within this response's results list."
+    - name: "chunk_id"
+      type: "string"
+      required: true
+      description: "The originating Phase 4 chunk_id, unchanged - never re-derived or invented here."
+    - name: "score"
+      type: "number"
+      required: true
+      description: "BM25 lexical relevance score. NOT evidence of legal authority; never to be used as, or confused with, a citation."
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+      description: "Preserved unchanged from the Phase 4 chunk - never inferred from score, never reclassified here."
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+      description: "Preserved unchanged from the Phase 4 chunk. Phase 5 does NOT implement the jurisdiction firewall (Phase 12 owns it) - this field is passthrough metadata only, for a later phase to enforce."
+    - name: "content_hash"
+      type: "string"
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+      description: "Propagated verbatim from the Phase 4 chunk (config/corpus_provenance_schema.yaml PROV-SAFE-01/05 lineage)."
+    - name: "page_numbers"
+      type: "list[integer]"
+      required: true
+    - name: "block_ids"
+      type: "list[string]"
+      required: true
+      description: "Never empty - a retrieval result must always trace back to at least one Phase 3 block."
+    - name: "chunk_text"
+      type: "string"
+      required: true
+      description: "Verbatim copy of the originating chunk's text - the safe evidence reference for this baseline. Never summarized, paraphrased, or rewritten."
+
+safety_invariants:
+  - id: "RETRIEVAL-SCHEMA-SAFE-01"
+    rule: "score is documented as a lexical relevance signal only, never as legal authority or a citation."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "RETRIEVAL-SCHEMA-SAFE-02"
+    rule: "block_ids and page_numbers are never empty; every retrieval result traces back to at least one Phase 3 block and page."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "RETRIEVAL-SCHEMA-SAFE-03"
+    rule: "jurisdiction and source_family_id are passthrough fields only - this schema does not define or imply any jurisdiction-enforcement or source-authority behavior (owned by Phases 12/2 respectively)."
+    source_label: "[ENGINEERING RECOMMENDATION]"

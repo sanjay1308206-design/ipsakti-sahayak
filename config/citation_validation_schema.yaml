@@ -1,0 +1,145 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 9 machine-readable citation-reference/validation-result/coverage
+# output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_09_CITATION_VALIDATION.md
+#
+# This is the SHAPE produced by src/citation/serialize.py. It is not a
+# generated-answer or grounded-generation schema (Phase 10); it is Phase
+# 9's deterministic citation-integrity validation representation.
+
+schema_version: "1.0.0"
+
+citation_reference:
+  description: "The untrusted-input shape - conceptually a citation reference as it arrives from a generated claim, before validation. Deliberately unvalidated at construction; validator.py classifies malformed values."
+  fields:
+    - name: "evidence_id"
+      type: "string_or_null_or_malformed"
+      required: false
+      description: "The evidence_id being cited. May be null, empty, or any other value in a raw/untrusted reference - the validator classifies it, this schema does not reject it."
+    - name: "schema_version"
+      type: "string"
+      required: true
+    - name: "citation_ref_id"
+      type: "string_or_null"
+      required: false
+      description: "Optional caller-assigned identifier for this reference. Inert display metadata only."
+    - name: "display_order"
+      type: "integer_or_null"
+      required: false
+      description: "Optional display/order metadata. Never used for evidence identity or resolution."
+
+resolved_evidence_summary:
+  description: "Evidence identity information, populated ONLY on a VALID result, after integrity verification. A strict subset of Phase 8's Evidence - never duplicates evidence_text or any legal conclusion."
+  fields:
+    - name: "evidence_id"
+      type: "string"
+      required: true
+    - name: "chunk_id"
+      type: "string"
+      required: true
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+
+citation_validation_result:
+  description: "The validator's deterministic, trusted output. Exactly one of VALID/INVALID/UNRESOLVED. Never contains a generated legal conclusion, answer, or claim."
+  fields:
+    - name: "citation_reference"
+      type: "citation_reference"
+      required: true
+    - name: "status"
+      type: "enum"
+      enum_ref: "status_vocabulary"
+      required: true
+    - name: "reason_code"
+      type: "enum_or_null"
+      enum_ref: "reason_code_vocabulary"
+      required: true
+      description: "null if and only if status is VALID."
+    - name: "requested_evidence_id"
+      type: "string_or_null"
+      required: true
+    - name: "resolved_evidence"
+      type: "resolved_evidence_summary_or_null"
+      required: true
+      description: "non-null if and only if status is VALID."
+    - name: "occurrence_index"
+      type: "integer"
+      required: true
+      description: "0-based position within the batch that was validated - preserves input order, never set/dict iteration order."
+    - name: "is_duplicate_occurrence"
+      type: "boolean"
+      required: true
+      description: "true if this reference's evidence_id string already appeared at an earlier occurrence_index in the same validation call."
+    - name: "detail"
+      type: "string_or_null"
+      required: true
+      description: "Human-readable explanation of the status/reason_code - never a legal conclusion, never fabricated data."
+    - name: "validator_schema_version"
+      type: "string"
+      required: true
+
+citation_coverage_metrics:
+  description: "Citation-INTEGRITY coverage only - never legal correctness, claim support, or answer factual accuracy."
+  fields:
+    - name: "schema_version"
+      type: "string"
+      required: true
+    - name: "total_references"
+      type: "integer"
+      required: true
+    - name: "valid_count"
+      type: "integer"
+      required: true
+    - name: "invalid_count"
+      type: "integer"
+      required: true
+    - name: "unresolved_count"
+      type: "integer"
+      required: true
+    - name: "unique_valid_evidence_id_count"
+      type: "integer"
+      required: true
+      description: "Distinct evidence_id values among VALID results only."
+    - name: "duplicate_occurrence_count"
+      type: "integer"
+      required: true
+    - name: "citation_integrity_validation_rate"
+      type: "number"
+      required: true
+      description: "valid_count / total_references (0.0 when total_references is 0). Citation-integrity rate only - never legal/answer correctness."
+
+status_vocabulary: ["VALID", "INVALID", "UNRESOLVED"]
+
+reason_code_vocabulary:
+  [
+    "EVIDENCE_ID_MISSING",
+    "MALFORMED_REFERENCE",
+    "SCHEMA_MISMATCH",
+    "EVIDENCE_NOT_FOUND",
+    "INVALID_PACK",
+    "EVIDENCE_INTEGRITY_FAILURE",
+    "EVIDENCE_PROVENANCE_FAILURE",
+  ]
+
+safety_invariants:
+  - id: "CITATION-SCHEMA-SAFE-01"
+    rule: "reason_code is null if and only if status is VALID; resolved_evidence is non-null if and only if status is VALID."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SCHEMA-SAFE-02"
+    rule: "citation_validation_result and citation_coverage_metrics deserialization performs full explicit field reconstruction and rejects any missing/malformed field - never a silently-repaired partial object."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SCHEMA-SAFE-03"
+    rule: "citation_reference deserialization validates only the envelope shape, never the evidence_id value itself - malformed-value classification belongs to the validator, not the parser."
+    source_label: "[ENGINEERING RECOMMENDATION]"

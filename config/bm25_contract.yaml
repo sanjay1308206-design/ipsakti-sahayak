@@ -1,0 +1,61 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 5 machine-readable BM25 index/config contract, mirroring
+# config/chunking_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_05_BM25_BASELINE.md
+# Implementation: src/retrieval/index.py, src/retrieval/bm25.py
+
+contract_version: "1.0.0"
+
+algorithm: "OKAPI_BM25"
+
+# [ENGINEERING RECOMMENDATION] standard textbook defaults (Robertson &
+# Zaragoza), not tuned for this corpus - tuning belongs to Phase 16
+# evaluation, never to this baseline.
+default_parameters:
+  k1: 1.5
+  b: 0.75
+
+parameter_bounds:
+  k1_minimum: 0.0
+  b_minimum: 0.0
+  b_maximum: 1.0
+
+tokenizer_policy_version: "v1"
+
+size_unit: "TOKEN_COUNT"  # document_lengths/average_document_length are measured in tokens, not characters
+
+accepted_input_type: "list[chunking.models.Chunk]"
+
+stopword_policy: "NONE"  # [ENGINEERING RECOMMENDATION] see docs Section E - no stopword removal in this baseline
+
+idf_formula: "ln(1 + (N - df + 0.5) / (df + 0.5))"  # the "+1 inside the log" non-negative-IDF variant
+
+output_requirements:
+  - "An index/result serialization, if produced, must be deterministic JSON (sort_keys, fixed separators, UTF-8) for identical chunk input + identical Bm25Config."
+  - "Every RetrievalResult must preserve document_id, source_family_id, jurisdiction, content_hash, page_numbers, and block_ids unchanged from the originating Phase 4 Chunk."
+  - "BM25 score must never be represented as, or accepted as, a legal citation or an authority ranking (Phase 8/9 own citation architecture and validation)."
+  - "synthetic must be propagated unchanged onto every RetrievalResult."
+
+determinism_requirements:
+  - "Index build order (chunk_ids, document_lengths, term_frequencies) matches the input chunk list order exactly - never re-sorted, never derived from dict/set iteration order."
+  - "Ranking ties are broken by ascending chunk_id after descending score - never insertion order, random order, timestamps, or memory addresses."
+  - "Running build_index() and query() repeatedly on identical input produces identical index statistics, scores, ordering, and serialized JSON."
+
+safety_invariants:
+  - id: "BM25-SAFE-01"
+    rule: "Every RetrievalResult traces back to at least one block_id and page_number, and carries the source document's document_id/source_family_id/jurisdiction/content_hash unchanged - a retrieval result must never become a detached text fragment."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "BM25-SAFE-02"
+    rule: "A chunk with zero matching query terms (BM25 score of exactly 0.0) is excluded from results, never padded in to satisfy top_k."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BM25-SAFE-03"
+    rule: "build_index() rejects duplicate chunk_id values and non-Chunk input with a typed exception rather than silently producing a corrupt or ambiguous index."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BM25-SAFE-04"
+    rule: "query() rejects a non-positive or non-integer top_k with ValueError rather than silently clamping or crashing; top_k larger than the number of matches simply returns however many actually matched."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BM25-SAFE-05"
+    rule: "The BM25 index/score never implements, and is never presented as, the jurisdiction firewall (Phase 12) - jurisdiction is preserved as passthrough metadata only."
+    source_label: "[ENGINEERING RECOMMENDATION]"

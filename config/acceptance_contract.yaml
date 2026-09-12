@@ -1,0 +1,252 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 0 machine-readable acceptance contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_00_SCOPE_AND_ACCEPTANCE.md (Section 13)
+#
+# status vocabulary: DEFINED | IN_PROGRESS | IMPLEMENTED | VALIDATED
+#   - "status" describes CONTRACT status, never implementation status.
+#   - No capability may be marked IMPLEMENTED or VALIDATED until its
+#     owner_phase has actually been implemented, tested, and validated
+#     under an explicit instruction to do so.
+
+project:
+  id: "PS-26045"
+  name: "IP-SAKTI Sahayak"
+
+phase:
+  id: 0
+  name: "Problem, Scope & Acceptance Contract"
+
+source_discipline_labels:
+  - "[OFFICIAL PS]"
+  - "[OFFICIAL SOURCE]"
+  - "[EXTERNAL RESEARCH]"
+  - "[ENGINEERING RECOMMENDATION]"
+  - "[OUR ENHANCEMENT]"
+  - "[ASSUMPTION]"
+  - "[DEFERRED]"
+
+status_vocabulary:
+  - "DEFINED"
+  - "IN_PROGRESS"
+  - "IMPLEMENTED"
+  - "VALIDATED"
+
+mandatory_capabilities:
+  - id: "CAP-00"
+    name: "Problem, Scope & Acceptance Contract"
+    owner_phase: 0
+    required_behavior: "Produce an explicit, testable engineering contract translating the Master Reference into defined scope, boundaries, and per-capability ownership."
+    test_requirement: "Automated tests validating the contract document and YAML schema, field completeness, ID uniqueness, and internal consistency."
+    acceptance_criterion: "Every mandatory PS capability has an owner, test, and acceptance criterion."
+    status: "DEFINED"
+
+  - id: "CAP-01"
+    name: "Domain Taxonomy & Regulatory Decision Tree"
+    owner_phase: 1
+    required_behavior: "Turn the domain into a structured classification problem: formulation categories, intended-use questions, claims, classical/proprietary/new-drug branches, food/cosmetic/phytopharma branches, IP protection categories, ABS/TK concepts."
+    test_requirement: "Classification schema + decision tree + labeled seed examples, tested against a held-out labeled set."
+    acceptance_criterion: "A test set can be classified without an LLM deciding everything."
+    status: "DEFINED"
+
+  - id: "CAP-02"
+    name: "Authority Matrix & Corpus Lock"
+    owner_phase: 2
+    required_behavior: "Build a source registry with authority tier, jurisdiction, document type, URL, version, effective date, retrieval date, checksum, refresh status."
+    test_requirement: "Tests verifying every target question category resolves to at least one registered authoritative source."
+    acceptance_criterion: "Every target question category has at least one authoritative evidence path."
+    status: "DEFINED"
+
+  - id: "CAP-03"
+    name: "Document Ingestion & Legal Structure Extraction"
+    owner_phase: 3
+    required_behavior: "Convert source documents into structured records (headings, sections, subsections, clauses, tables, page numbers, dates, provenance) without destroying legal hierarchy."
+    test_requirement: "Tests tracing a structured section back to its exact source document and location."
+    acceptance_criterion: "A source section can be traced back to the exact document and location."
+    status: "DEFINED"
+
+  - id: "CAP-04"
+    name: "Legal-Aware Chunking"
+    owner_phase: 4
+    required_behavior: "Create retrieval units via section/subsection/article-aware chunking with metadata propagation."
+    test_requirement: "Tests asserting retrieved chunks retain jurisdiction, section, version, and effective-date metadata."
+    acceptance_criterion: "Retrieved chunks retain jurisdiction, section, version, and effective-date context."
+    status: "DEFINED"
+
+  - id: "CAP-05"
+    name: "BM25 Baseline"
+    owner_phase: 5
+    required_behavior: "Build a BM25 index and query API as the measurable lexical retrieval baseline."
+    test_requirement: "Retrieval benchmark producing Recall@K, MRR, nDCG on a curated query set."
+    acceptance_criterion: "Every retrieval improvement is measured against this baseline."
+    status: "DEFINED"
+
+  - id: "CAP-06"
+    name: "Multilingual Dense Retrieval"
+    owner_phase: 6
+    required_behavior: "Add BGE-M3 CPU embeddings + FAISS index + embedding cache for semantic/multilingual retrieval."
+    test_requirement: "Benchmark comparison against the BM25 baseline, run within hardware constraints."
+    acceptance_criterion: "Dense retrieval adds measurable recall without exhausting the laptop."
+    status: "DEFINED"
+
+  - id: "CAP-07"
+    name: "Hybrid Fusion + Reranking"
+    owner_phase: 7
+    required_behavior: "Combine BM25 + dense top-K via RRF, then apply a cross-encoder reranker."
+    test_requirement: "Reranker benchmark comparing Precision@K / nDCG before and after reranking."
+    acceptance_criterion: "Reranking measurably improves Precision@K / nDCG."
+    status: "DEFINED"
+
+  - id: "CAP-08"
+    name: "Evidence Object & Citation Architecture"
+    owner_phase: 8
+    required_behavior: "Represent evidence as a first-class backend object: evidence IDs, source metadata, section/page, version, effective date, authority tier, URL."
+    test_requirement: "Tests asserting every generated claim resolves to a concrete evidence ID."
+    acceptance_criterion: "Every generated claim can point to a concrete evidence ID."
+    status: "DEFINED"
+
+  - id: "CAP-09"
+    name: "Citation Validation"
+    owner_phase: 9
+    required_behavior: "Extract claims, validate evidence IDs, and check source/version/jurisdiction/support consistency."
+    test_requirement: "Rejection tests using fabricated/mismatched evidence IDs."
+    acceptance_criterion: "Fake evidence IDs and unsupported claims are rejected."
+    status: "DEFINED"
+
+  - id: "CAP-10"
+    name: "Grounded Generation"
+    owner_phase: 10
+    required_behavior: "Generate answers only from validated evidence, with uncertainty wording and disclaimer, with a local fallback model."
+    test_requirement: "Tests verifying unsupported claims are detected/rejected and grounded answers pass citation tests."
+    acceptance_criterion: "Unsupported claims are detected/rejected; grounded answers pass citation tests."
+    status: "DEFINED"
+
+  - id: "CAP-11"
+    name: "Formulation Classification Engine"
+    owner_phase: 11
+    required_behavior: "Deterministic rule engine + minimal clarifying questions producing a structured classification result."
+    test_requirement: "Classification API tested against a labeled test set with an agreed F1/accuracy threshold."
+    acceptance_criterion: "Classification meets agreed F1/accuracy threshold and ambiguous cases escalate."
+    status: "DEFINED"
+
+  - id: "CAP-12"
+    name: "Jurisdiction Firewall"
+    owner_phase: 12
+    required_behavior: "Separate India/international evidence via distinct indices/collections, typed retrieval requests, jurisdiction metadata, and final validation."
+    test_requirement: "Cross-jurisdiction leakage test suite."
+    acceptance_criterion: "Cross-jurisdiction leakage test returns zero leakage."
+    status: "DEFINED"
+
+  - id: "CAP-13"
+    name: "Confidence, Safety & Abstention"
+    owner_phase: 13
+    required_behavior: "Compute evidence-derived confidence (retrieval, authority, coverage, classification, version signals) with abstention thresholds."
+    test_requirement: "Tests over low-confidence/high-stakes synthetic cases."
+    acceptance_criterion: "Low-confidence/high-stakes cases abstain or escalate instead of guessing."
+    status: "DEFINED"
+
+  - id: "CAP-14"
+    name: "Multilingual Delivery"
+    owner_phase: 14
+    required_behavior: "Language detection, canonicalization, Bhashini adapter, answer translation preserving evidence identity."
+    test_requirement: "Citation-preservation tests per evaluated language."
+    acceptance_criterion: "Meaning and evidence references survive translation; only evaluated languages are advertised."
+    status: "DEFINED"
+
+  - id: "CAP-15"
+    name: "Human-in-the-Loop"
+    owner_phase: 15
+    required_behavior: "Escalation reason, evidence pack, confidence, unresolved questions, facilitator handoff."
+    test_requirement: "Tests over ambiguous/out-of-scope/high-stakes synthetic cases."
+    acceptance_criterion: "Ambiguous/out-of-scope/high-stakes cases reliably escalate."
+    status: "DEFINED"
+
+  - id: "CAP-16"
+    name: "Evaluation & Red-Team Benchmark"
+    owner_phase: 16
+    required_behavior: "Build retrieval, classification, generation, citation, safety, multilingual, and adversarial benchmark sets."
+    test_requirement: "Automated, reproducible regression suite execution."
+    acceptance_criterion: "Regression suite runs automatically and results are reproducible."
+    status: "DEFINED"
+
+  - id: "CAP-17"
+    name: "Backend Productization"
+    owner_phase: 17
+    required_behavior: "FastAPI service interfaces, configuration, persistence, audit logs, error handling, health endpoints."
+    test_requirement: "Integration tests exercising core workflows via API only."
+    acceptance_criterion: "Core workflows run through stable APIs without notebook/manual steps."
+    status: "DEFINED"
+
+  - id: "CAP-18"
+    name: "Frontend"
+    owner_phase: 18
+    required_behavior: "React/Vite interface for chat, classification, jurisdiction, evidence, citations, confidence, escalation."
+    test_requirement: "UI/e2e tests covering every core workflow."
+    acceptance_criterion: "All core workflows can be completed through UI only."
+    status: "DEFINED"
+
+  - id: "CAP-19"
+    name: "Security & Adversarial Hardening"
+    owner_phase: 19
+    required_behavior: "Input validation, document-as-data policy, path/file limits, prompt-injection tests, access controls, audit logs."
+    test_requirement: "Security test suite covering known attack classes."
+    acceptance_criterion: "Known attack cases fail safely."
+    status: "DEFINED"
+
+  - id: "CAP-20"
+    name: "Deployment Engineering"
+    owner_phase: 20
+    required_behavior: "Docker/Compose profiles, environment configuration, DB migration, startup checks, model provisioning, offline/local fallback."
+    test_requirement: "Fresh-environment provisioning test."
+    acceptance_criterion: "Fresh environment can be provisioned and started without source edits."
+    status: "DEFINED"
+
+  - id: "CAP-21"
+    name: "Observability, Backup & Corpus Refresh"
+    owner_phase: 21
+    required_behavior: "Metrics, logs, latency tracking, retrieval diagnostics, citation rejection rate, abstention rate, backups, restore tests, corpus refresh pipeline."
+    test_requirement: "Backup/restore test + corpus refresh dry run."
+    acceptance_criterion: "A corpus update can be validated, re-indexed, evaluated, and released safely."
+    status: "DEFINED"
+
+  - id: "CAP-22"
+    name: "CI/CD & Production Release"
+    owner_phase: 22
+    required_behavior: "Automated tests -> evaluation gates -> container build -> staging smoke tests -> release artifact -> production deployment."
+    test_requirement: "CI pipeline run producing a versioned, rollback-tested release."
+    acceptance_criterion: "A release is reproducible, tested, and rollback-capable."
+    status: "DEFINED"
+
+  - id: "CAP-23"
+    name: "Production Validation"
+    owner_phase: 23
+    required_behavior: "Load tests, failure recovery, multilingual regression, citation tests, jurisdiction isolation, backup/restore, deployment rehearsal."
+    test_requirement: "Full production-readiness test battery against the Final Production Gate."
+    acceptance_criterion: "All critical gates pass; unsupported capabilities remain explicitly out of scope."
+    status: "DEFINED"
+
+# Technologies explicitly excluded from current scope per the Final
+# Architecture Decision Lock / Final Decision Lock. Not implemented; not
+# owned by any current phase. Promoted only by explicit future instruction
+# plus benchmarked justification. See docs/PHASE_00_SCOPE_AND_ACCEPTANCE.md
+# Section 12 and docs/MASTER_REFERENCE_LOCK.md Section J.
+deferred_technologies:
+  - id: "DEF-01"
+    name: "Multi-agent / single-agent tool orchestration"
+  - id: "DEF-02"
+    name: "Knowledge graph (formulations, ingredients, laws, authorities, jurisdictions)"
+  - id: "DEF-03"
+    name: "Graph-RAG (multi-hop evidence retrieval)"
+  - id: "DEF-04"
+    name: "Expanded registry/search connectors beyond the locked Authoritative Source Strategy"
+  - id: "DEF-05"
+    name: "Expanded language coverage beyond natively-evaluated languages"
+  - id: "DEF-06"
+    name: "Enterprise authentication / RBAC and advanced multi-user isolation"
+  - id: "DEF-07"
+    name: "Advanced observability/analytics beyond Phase 21 operational scope"
+  - id: "DEF-08"
+    name: "Large local 7B/14B LLM as a primary dependency"
+  - id: "DEF-09"
+    name: "Kubernetes / cloud infrastructure"

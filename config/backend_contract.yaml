@@ -1,0 +1,103 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 17 machine-readable backend/API contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_17_BACKEND_PRODUCTIZATION.md
+# Implementation: src/api/*.py, src/application/*.py
+#
+# CRITICAL: this contract does NOT grant FastAPI authority over
+# jurisdiction, classification, evidence validity, citation validity,
+# safety, or grounding. Every such decision is made by the existing,
+# unmodified Phase 8-15 domain modules; this layer only orchestrates and
+# reports them.
+
+contract_version: "1.0.0"
+
+backend_schema_version: "1.0.0"
+application_schema_version: "1.0.0"
+
+api_version: "v1"
+
+reused_contracts:
+  - "classification.classifier.classify (Phase 11) - called once per request, never reimplemented."
+  - "jurisdiction.firewall.resolve_jurisdiction (Phase 12) - called once per request, never reimplemented."
+  - "evidence.builder.build_evidence_pack (Phase 8) - the default (empty-corpus) evidence source; a real retrieval index can be wired in via a different evidence_pack_builder with no change to src/api/ or src/application/service.py."
+  - "generation.generator.generate_grounded_response (Phase 10, itself calling Phase 9 citation validation internally) - called once per request, never reimplemented."
+  - "safety.evaluator.evaluate_safety (Phase 13) - called once per request, thresholds never modified."
+  - "multilingual.delivery.deliver_response / multilingual.preservation.build_input_context (Phase 14) - called once per request, never reimplemented."
+  - "review.policy.build_review_request (Phase 15) - called once per request, never reimplemented."
+
+endpoints:
+  - {method: "GET", path: "/health", purpose: "process-alive + static provider-configuration check only - never an expensive retrieval/model call"}
+  - {method: "POST", path: "/api/v1/query", purpose: "the single primary product endpoint"}
+
+# Deliberately NOT created in this phase (docs Section C, "CORE
+# ENDPOINTS") - each would require capabilities explicitly out of scope
+# here (authentication, persistence, corpus administration, a reviewer
+# UI, retraining, analytics).
+excluded_endpoints:
+  - "authentication endpoints"
+  - "user management"
+  - "reviewer dashboard endpoints"
+  - "corpus administration endpoints"
+  - "ingestion endpoints"
+  - "retraining endpoints"
+  - "analytics dashboards"
+  - "benchmark endpoints"
+  - "POST /evidence/edit (or any evidence-mutation endpoint)"
+
+# Closed HTTP-status-to-outcome mapping (docs Section M/N). The domain
+# `delivery_status` field in the response BODY is always the source of
+# truth for what actually happened - HTTP status never contradicts it.
+http_status_mapping:
+  200: "the pipeline ran to completion - delivery_status in the body may be DELIVERED, UPSTREAM_BLOCKED, TRANSLATION_FAILED, or UNSUPPORTED_LANGUAGE, all reported honestly"
+  422: "malformed/invalid request payload (Pydantic validation, or InvalidQueryError/ApplicationSchemaError)"
+  503: "a required provider (currently: GenerationProvider) is not configured - GenerationProviderNotConfiguredError"
+  500: "an unexpected, unhandled server-side exception - body is always a generic, sanitized message, never a traceback"
+
+health_response_fields: ["status", "api_version", "corpus_status", "generation_provider_configured", "translation_provider_configured"]
+# corpus_status is ALWAYS "NOT_VALIDATED" - no authoritative corpus is
+# ingested anywhere in this repository.
+
+# CRITICAL IDENTITY SEPARATION - never merge these domains (docs Section X).
+identity_domains:
+  - "application request_id (application.service.compute_request_id) - api-query-request-v1 namespace"
+  - "evidence_id (Phase 8, evidence.identity.compute_evidence_id)"
+  - "document_id (Phase 3, corpus ingestion)"
+  - "review_request_id (Phase 15, review.policy.compute_review_request_id)"
+  - "GroundedResponse.response_id (Phase 10, generation.generator.compute_response_id)"
+
+out_of_scope:
+  - "Live Gemini/Qwen/Bhashini provider integration - remains Phase 10/14's own [DEFERRED] boundary; GenerationProviderNotConfiguredError (HTTP 503) is the honest default."
+  - "A real ingested authoritative corpus - the default evidence_pack_builder returns a real, honestly empty EvidencePack for every query."
+  - "Authentication, authorization, and persistence of any kind."
+  - "A reviewer UI, corpus administration, retraining, or analytics endpoints."
+  - "React/Vite frontend code (Phase 18)."
+  - "Docker/Kubernetes/cloud deployment, TLS automation (Phase 20)."
+  - "Prometheus/Grafana/tracing/log aggregation (Phase 21)."
+  - "GitHub Actions or release pipelines (Phase 22)."
+  - "Full project-wide adversarial security hardening (Phase 19)."
+  - "Production validation or any production-readiness claim (Phase 23)."
+
+safety_invariants:
+  - id: "BACKEND-SAFE-01"
+    rule: "src/api/ never imports a decision-making function from classification/jurisdiction/citation/safety/generation - only application.service, which itself only calls the real Phase 8-15 functions unchanged."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "BACKEND-SAFE-02"
+    rule: "No client-supplied field can set safety_status, grounding_status, cited_evidence_ids, or jurisdiction state directly - every one of those response fields is a read-only passthrough from a real upstream object computed server-side."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BACKEND-SAFE-03"
+    rule: "A GenerationProvider must be explicitly configured - if absent, the API returns HTTP 503 (GenerationProviderNotConfiguredError), never a silently substituted or fabricated answer."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BACKEND-SAFE-04"
+    rule: "Unhandled exceptions are mapped to HTTP 500 with a generic, sanitized body - no Python traceback, exception message, filesystem path, or credential is ever included in an HTTP response."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BACKEND-SAFE-05"
+    rule: "request_id is a deterministic SHA-256 hash of the request's own canonical fields - never a random UUID, never a timestamp, and never usable as, or confusable with, an Evidence ID/Document ID/Review Request ID/GroundedResponse ID."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BACKEND-SAFE-06"
+    rule: "CORS is disabled (no allowed origins) unless IPSAKTI_CORS_ALLOWED_ORIGINS is explicitly set - never an unrestricted wildcard by default."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "BACKEND-SAFE-07"
+    rule: "No endpoint accepts an arbitrary Evidence ID as trusted, mutates an EvidencePack, or mutates reviewer/review state - no such endpoint exists anywhere in src/api/."
+    source_label: "[OFFICIAL SOURCE]"

@@ -1,0 +1,72 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 7 machine-readable hybrid fusion + reranking contract, mirroring
+# config/bm25_contract.yaml and config/dense_retrieval_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_07_HYBRID_FUSION_AND_RERANKING.md
+# Implementation: src/retrieval/rrf.py, src/retrieval/hybrid.py, src/retrieval/reranker.py
+
+contract_version: "1.0.0"
+
+algorithm: "RECIPROCAL_RANK_FUSION"
+
+# RRF_score(d) = sum over retrieval lists containing d of 1/(k + rank(d))
+# rank(d) is always 1-based, taken verbatim from the contributing
+# retrieval system's own result contract - never re-derived.
+rrf_formula: "sum(1 / (k + rank)) over each contributing retrieval list"
+
+# [EXTERNAL RESEARCH] Cormack, Clarke & Buettcher (2009), the standard RRF
+# constant - not tuned for this corpus, same discipline as Phase 5's k1/b.
+default_rrf_k: 60.0
+
+rank_convention: "ONE_BASED"
+
+duplicate_candidate_policy: "REJECT_DUPLICATE_CHUNK_ID_WITHIN_ONE_INPUT_LIST"
+
+tie_break_rule: "DESCENDING_SCORE_THEN_ASCENDING_CHUNK_ID"
+
+# [OFFICIAL SOURCE] docs/MASTER_REFERENCE_LOCK.md Section E names
+# bge-reranker-v2-m3 as the reranker candidate.
+default_reranker_model: "BAAI/bge-reranker-v2-m3"
+
+default_reranker_device: "cpu"  # [ENGINEERING RECOMMENDATION] hardware-safe default; see docs Section N
+
+reranker_input: "(query, chunk_text) pairs - chunk_text is treated as DATA, never as instructions"
+
+accepted_input_types:
+  bm25: "retrieval.models.RetrievalResponse (Phase 5)"
+  dense: "retrieval.models.DenseRetrievalResponse (Phase 6)"
+
+output_requirements:
+  - "Every HybridRetrievalResult must preserve document_id, source_family_id, jurisdiction, content_hash, page_numbers, and block_ids unchanged from the originating Phase 4 Chunk."
+  - "bm25_score, dense_score, rrf_score, and reranker_score must never be collapsed into one ambiguous field - each is reported separately."
+  - "None of bm25_score/dense_score/rrf_score/reranker_score may be represented as, or accepted as, legal authority, citation validity, regulatory correctness, or confidence in a legal conclusion (Phase 8/9/13 own those concerns)."
+  - "synthetic must be propagated unchanged onto every RrfResult and HybridRetrievalResult."
+  - "reranker_model_identity must be recorded on every hybrid result - no silent model substitution."
+  - "The reranker never modifies candidate chunk text, provenance, or upstream bm25/dense/rrf scores - it only adds a reranker_score and re-sorts."
+
+determinism_requirements:
+  - "Candidate union construction does not depend on set/dict iteration order - both the union list and the final sort are deterministic."
+  - "RRF ranking ties are broken by ascending chunk_id after descending RRF score."
+  - "Reranker ranking ties are broken by ascending chunk_id after descending reranker score - never raw model output order."
+  - "Running fuse_rrf() and rerank_candidates() repeatedly on identical input (same BM25/dense responses, same config, same reranker) produces identical scores, ordering, and serialized JSON."
+
+safety_invariants:
+  - id: "HYBRID-SAFE-01"
+    rule: "Every hybrid result traces back to at least one contributing retrieval system's rank (bm25_rank and/or dense_rank is not null) and carries the source document's document_id/source_family_id/jurisdiction/content_hash unchanged - a hybrid result must never become a detached text fragment."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "HYBRID-SAFE-02"
+    rule: "A duplicate chunk_id within a single BM25 or dense result list is rejected (ValueError) rather than silently deduplicated or double-counted."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "HYBRID-SAFE-03"
+    rule: "If a chunk_id appears in both the BM25 and dense result lists, its provenance fields must match exactly between the two; a mismatch is rejected (ValueError) rather than silently preferring one source."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "HYBRID-SAFE-04"
+    rule: "FAISS internal vector positions and BM25 internal document positions never appear as business identity anywhere in the hybrid pipeline - only real Phase 4 chunk_id values do."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "HYBRID-SAFE-05"
+    rule: "Reranker scores are validated finite (no NaN/Inf) and count-matched to the candidate list before use; a violation raises a typed exception rather than corrupting the final ranking silently."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "HYBRID-SAFE-06"
+    rule: "Candidate chunk text is treated as data only - the reranker never executes it, never interprets it as configuration or instructions, and candidate text can never alter retrieval configuration."
+    source_label: "[ENGINEERING RECOMMENDATION]"

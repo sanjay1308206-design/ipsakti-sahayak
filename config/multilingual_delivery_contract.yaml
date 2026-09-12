@@ -1,0 +1,108 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 14 machine-readable multilingual-delivery contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_14_MULTILINGUAL_DELIVERY.md
+# Implementation: src/multilingual/delivery.py, preservation.py, providers.py, models.py
+#
+# CRITICAL: this contract does NOT establish a validated language-coverage
+# claim, a translation-quality guarantee, or a jurisdiction-inference
+# rule. Every language tag below is [OUR ENHANCEMENT] scoped strictly to
+# what this project's own prior-phase tests have exercised at the
+# Unicode-plumbing level - never a claim of translation quality.
+
+contract_version: "1.0.0"
+
+multilingual_schema_version: "1.0.0"
+
+reused_contracts:
+  - "generation.models.GroundedResponse (Phase 10) - grounding_status, answer_text, cited_evidence_ids, synthetic, reused read-only, never recomputed."
+  - "safety.models.SafetyDecision (Phase 13) - safety_status, reused read-only, never overridden."
+
+# SCRIPT is a deterministic Unicode-codepoint-range classification only -
+# never a language claim (docs Section F).
+script_vocabulary: ["LATIN", "DEVANAGARI", "TAMIL", "MIXED", "UNKNOWN"]
+
+# [OUR ENHANCEMENT] LANGUAGE is a small, explicitly-scoped vocabulary -
+# exactly the languages this project's own prior-phase test fixtures have
+# exercised at the Unicode-plumbing level. NOT a translation-quality
+# claim for any of them (docs Section P) - LIVE TRANSLATION QUALITY IS
+# NOT VALIDATED for any language, including these.
+supported_language_vocabulary: ["en", "hi", "ta"]
+unspecified_language_token: "UNSPECIFIED"
+
+# Closed delivery-status vocabulary (docs Section H/I).
+delivery_status_vocabulary: ["DELIVERED", "TRANSLATION_FAILED", "UNSUPPORTED_LANGUAGE", "UPSTREAM_BLOCKED"]
+
+# Closed, every member independently reachable and tested.
+reason_code_vocabulary:
+  [
+    "LANGUAGE_UNSPECIFIED_NO_TRANSLATION_NEEDED",
+    "SOURCE_MATCHES_REQUESTED_NO_TRANSLATION_NEEDED",
+    "TRANSLATION_SUCCEEDED",
+    "MISSING_TRANSLATION_PROVIDER",
+    "TRANSLATION_PROVIDER_FAILED",
+    "UNSUPPORTED_LANGUAGE_REQUESTED",
+    "SAFETY_NOT_SAFE_TO_PRESENT",
+    "GROUNDING_NOT_GROUNDED",
+  ]
+
+# The ONLY value this field ever takes - a structural, machine-checkable
+# audit constant proving evidence is never touched (docs Section R).
+evidence_preservation_status_vocabulary: ["PRESERVED"]
+
+# HARD GATES - deterministic, ordered, first-match-wins (docs Section H).
+# Safety/grounding are checked BEFORE any translation attempt.
+hard_gate_order:
+  - {id: "D2", name: "SAFETY_NOT_SAFE_TO_PRESENT", result: "UPSTREAM_BLOCKED"}
+  - {id: "D3", name: "GROUNDING_NOT_GROUNDED", result: "UPSTREAM_BLOCKED"}
+  - {id: "D4", name: "UNSUPPORTED_LANGUAGE_REQUESTED", result: "UNSUPPORTED_LANGUAGE"}
+  - {id: "D5", name: "LANGUAGE_UNSPECIFIED_NO_TRANSLATION_NEEDED", result: "DELIVERED"}
+  - {id: "D6", name: "SOURCE_MATCHES_REQUESTED_NO_TRANSLATION_NEEDED", result: "DELIVERED"}
+  - {id: "D7", name: "MISSING_TRANSLATION_PROVIDER", result: "TRANSLATION_FAILED"}
+  - {id: "D8", name: "TRANSLATION_PROVIDER_FAILED", result: "TRANSLATION_FAILED"}
+  - {id: "D9", name: "TRANSLATION_SUCCEEDED", result: "DELIVERED"}
+
+# [OFFICIAL SOURCE] Bhashini is the Master Reference's own named
+# multilingual adapter direction (config/authority_matrix.yaml SF-08).
+# [DEFERRED] No live Bhashini (or any other) adapter is implemented -
+# neither credentials, network access, a specific endpoint, a specific
+# language pair, nor latency/quality guarantees can be assumed.
+bhashini_adapter_status: "DEFERRED_NO_CREDENTIAL_OR_ENDPOINT_OR_LANGUAGE_PAIR_ASSUMED"
+
+# Unicode NFC normalization only - never a translation (docs Section L).
+canonicalization_policy: "UNICODE_NFC_NORMALIZATION_ONLY_NEVER_A_TRANSLATION_NEVER_A_MEANING_CHANGE"
+
+out_of_scope:
+  - "Real translation quality claims of any kind (accuracy, BLEU, COMET, human evaluation) - LIVE TRANSLATION QUALITY NOT VALIDATED."
+  - "Language inference from IP address, physical location, timezone, system locale, or browser locale."
+  - "Jurisdiction inference from language or script - language is never jurisdiction."
+  - "A handcrafted legal/regulatory terminology translation dictionary."
+  - "Re-implementing classification, jurisdiction routing, citation validation, generation, or safety policy."
+  - "Human-in-the-loop workflow, reviewer queues, or approval systems (Phase 15's own scope)."
+
+safety_invariants:
+  - id: "MULTILINGUAL-SAFE-01"
+    rule: "Translation provider output is consulted ONLY for the display answer_text - it can never set cited_evidence_ids, grounding_status, safety_status, or synthetic, which are always a direct passthrough from the real upstream Phase 9/10/13 objects."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "MULTILINGUAL-SAFE-02"
+    rule: "A SafetyDecision that is not SAFE_TO_PRESENT, or a GroundedResponse that is not GROUNDED, always blocks delivery before any translation is attempted - translation can never rescue an abstained/escalated/failed upstream result."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "MULTILINGUAL-SAFE-03"
+    rule: "detect_script never determines or influences requested_language, and requested_language never determines or influences a jurisdiction decision - language is never jurisdiction, script is never language."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "MULTILINGUAL-SAFE-04"
+    rule: "original_query is always preserved unchanged and recoverable from the structured result - canonical_query and any translated answer_text never overwrite it."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "MULTILINGUAL-SAFE-05"
+    rule: "No Evidence ID, citation identity, document ID, content hash, source family, or jurisdiction value is ever mutated, regenerated, or fabricated by anything in src/multilingual/."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "MULTILINGUAL-SAFE-06"
+    rule: "TranslationOutput.metadata may never contain a credential-shaped key - enforced structurally, mirroring Phase 10's GenerationOutput guard."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "MULTILINGUAL-SAFE-07"
+    rule: "result_id is a deterministic SHA-256 hash of the result's own canonical fields - never a random UUID, never derived from a timestamp."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "MULTILINGUAL-SAFE-08"
+    rule: "synthetic=true evidence anywhere upstream is reflected as synthetic=true on the delivery result - never presented as real regulatory evidence."
+    source_label: "[ENGINEERING RECOMMENDATION]"

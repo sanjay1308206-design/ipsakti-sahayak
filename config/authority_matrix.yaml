@@ -1,0 +1,247 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 2 machine-readable authority matrix.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_02_AUTHORITY_MATRIX.md
+#
+# Exactly the 8 source families named in the Master Reference's
+# Authoritative Source Strategy table. No source family is added without
+# an explicit review and a version bump here (see corpus_lock.yaml
+# expansion_policy).
+
+authority_matrix_version: "1.0.0"
+
+source_families:
+
+  - source_family_id: "SF-01"
+    source_family_name: "India Code"
+    authority_tier: "PRIMARY_OFFICIAL"
+    authority_role: "PRIMARY_LEGISLATIVE_SOURCE"
+    jurisdiction_scope: "INDIA"
+    regulatory_domains:
+      - "Acts, sections, rules, regulations, notifications and other Indian legal material"
+    supported_question_types:
+      - "INDIA_LEGISLATIVE"
+    allowed_document_types:
+      - "Act"
+      - "Section"
+      - "Rule"
+      - "Regulation"
+      - "Notification"
+    url: "https://www.indiacode.nic.in/"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT."
+    corpus_admission_status: "PERMITTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations: []
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-02"
+    source_family_name: "IP India"
+    authority_tier: "PRIMARY_OFFICIAL"
+    authority_role: "IP_REGISTRY_AND_SEARCH_SERVICE"
+    jurisdiction_scope: "INDIA"
+    regulatory_domains:
+      - "Patents, trademarks, designs, GI and related public search/e-services"
+    supported_question_types:
+      - "IP_REGISTRATION_AND_SEARCH"
+    allowed_document_types:
+      - "Patent record"
+      - "Trademark record"
+      - "Design record"
+      - "GI record"
+    url: "https://ipindia.gov.in/"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT."
+    corpus_admission_status: "PERMITTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations: []
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-03"
+    source_family_name: "Ministry of Ayush"
+    authority_tier: "PRIMARY_OFFICIAL"
+    authority_role: "POLICY_AND_PROGRAMME_SOURCE"
+    jurisdiction_scope: "INDIA"
+    regulatory_domains:
+      - "Ayush policy, programmes and official Ayurveda-related material"
+    supported_question_types:
+      - "AYUSH_POLICY"
+    allowed_document_types:
+      - "Policy document"
+      - "Programme notification"
+    url: "https://ayush.gov.in/"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT."
+    corpus_admission_status: "PERMITTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations: []
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-04"
+    source_family_name: "CDSCO / Drugs & Cosmetics"
+    authority_tier: "PRIMARY_OFFICIAL"
+    authority_role: "DRUG_REGULATORY_AUTHORITY"
+    jurisdiction_scope: "INDIA"
+    regulatory_domains:
+      - "Regulatory material relevant to traditional drugs and Drugs & Cosmetics Rules"
+    supported_question_types:
+      - "TRADITIONAL_DRUG_REGULATION"
+    allowed_document_types:
+      - "Rule"
+      - "Notification"
+      - "Regulatory guidance"
+    url: "https://www.cdsco.gov.in/opencms/opencms/en/Traditional_Drugs/"
+    additional_urls:
+      - "https://www.cdsco.gov.in/opencms/opencms/en/Acts-and-rules/Drugs-Rules/"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT."
+    corpus_admission_status: "PERMITTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations:
+      - "Must remain logically distinguished from SF-05 (Ayurveda Aahara/food law) per the Master Reference's explicit callout; never merged into one 'Ayurvedic ingestible' bucket."
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-05"
+    source_family_name: "FSSAI"
+    authority_tier: "PRIMARY_OFFICIAL"
+    authority_role: "FOOD_REGULATORY_AUTHORITY"
+    jurisdiction_scope: "INDIA"
+    regulatory_domains:
+      - "Ayurveda Aahara regulations and related food-law material"
+    supported_question_types:
+      - "AYURVEDA_AAHARA_FOOD_LAW"
+    allowed_document_types:
+      - "Gazette Notification"
+      - "Advisory"
+    url: "https://fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf"
+    additional_urls:
+      - "https://www.fssai.gov.in/food-law/advisories"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT."
+    corpus_admission_status: "PERMITTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations:
+      - "Must remain logically distinguished from SF-04 (traditional drug regulation) per the Master Reference's explicit callout."
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-06"
+    source_family_name: "WIPO / WIPO Lex"
+    authority_tier: "PRIMARY_OFFICIAL"
+    authority_role: "INTERNATIONAL_TREATY_SOURCE"
+    jurisdiction_scope: "INTERNATIONAL"
+    regulatory_domains:
+      - "International IP treaties, traditional knowledge and genetic-resources material"
+    supported_question_types:
+      - "INTERNATIONAL_IP_TREATY"
+    allowed_document_types:
+      - "Treaty text"
+      - "Treaty resource page"
+    url: "https://www.wipo.int/en/web/traditional-knowledge/wipo-treaty-on-ip-gr-and-associated-tk"
+    additional_urls:
+      - "https://www.wipo.int/wipolex/en/treaties/textdetails/19849"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT."
+    corpus_admission_status: "PERMITTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations: []
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-07"
+    source_family_name: "TKDL"
+    authority_tier: "PRIMARY_OFFICIAL_RESTRICTED"
+    authority_role: "TRADITIONAL_KNOWLEDGE_REGISTRY"
+    jurisdiction_scope: "INDIA"
+    jurisdiction_scope_confidence: "[ASSUMPTION]"
+    regulatory_domains:
+      - "Traditional knowledge documentation"
+    supported_question_types:
+      - "TRADITIONAL_KNOWLEDGE_DATABASE"
+    allowed_document_types:
+      - "Authorized/publicly accessible traditional knowledge record"
+    url: null
+    url_status: "[ASSUMPTION]/[DEFERRED] - not listed in the Master Reference's Research Sources & Provenance section; must not be invented"
+    provenance_requirements:
+      ["document_type", "url", "version", "effective_date", "retrieved_at", "content_hash", "refresh_status"]
+    version_requirements: ["version", "effective_date", "refresh_status"]
+    validation_requirements:
+      "Metadata must be independently confirmed against the live official source before ADMIT. Full-database/protected access must never be assumed."
+    corpus_admission_status: "PERMITTED_RESTRICTED"
+    corpus_role: "EVIDENCE_SOURCE"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_ESTABLISHED_BY_MASTER_REFERENCE"
+    limitations:
+      - "Use only authorized/publicly accessible material; do not assume protected full-database access."
+      - "Access URL not specified by the Master Reference; not invented here."
+    source_label: "[OFFICIAL SOURCE]"
+
+  - source_family_id: "SF-08"
+    source_family_name: "Bhashini"
+    authority_tier: "SERVICE_ADAPTER"
+    authority_role: "LANGUAGE_SERVICE_PROVIDER"
+    jurisdiction_scope: "NOT_APPLICABLE"
+    regulatory_domains: []
+    supported_question_types: []
+    allowed_document_types: []
+    url: "https://app.bhashini.ai/translate"
+    provenance_requirements: []
+    version_requirements: []
+    validation_requirements:
+      "Not applicable - Bhashini is a translation service, not a document source; no document provenance is tracked against it."
+    corpus_admission_status: "NOT_APPLICABLE"
+    corpus_role: "SERVICE_ADAPTER"
+    conflict_policy:
+      policy_reference: "docs/PHASE_02_SOURCE_CONFLICT_POLICY.md"
+      inter_family_hierarchy: "NOT_APPLICABLE"
+    limitations:
+      - "Verify exact service terms and supported languages before production use (Master Reference's own instruction)."
+      - "Never treated as an evidence source; excluded from permitted_source_families in corpus_lock.yaml."
+    source_label: "[OFFICIAL SOURCE]"
+
+category_groupings:
+  india_regulatory_sources: ["SF-01", "SF-02", "SF-03", "SF-04", "SF-05"]
+  international_ip_sources: ["SF-06"]
+  knowledge_traditional_knowledge_sources: ["SF-07"]
+  language_service_sources: ["SF-08"]
+  non_authoritative_contextual_sources: []  # deliberately empty - see docs/PHASE_02_AUTHORITY_MATRIX.md Section 6.2
+
+valid_jurisdictions: ["INDIA", "INTERNATIONAL", "NOT_APPLICABLE", "OTHER_UNSPECIFIED"]
+valid_authority_tiers: ["PRIMARY_OFFICIAL", "PRIMARY_OFFICIAL_RESTRICTED", "SERVICE_ADAPTER"]
+valid_corpus_roles: ["EVIDENCE_SOURCE", "SERVICE_ADAPTER"]

@@ -1,0 +1,91 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 10 machine-readable grounded-generation contract, mirroring
+# config/citation_validation_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_10_GROUNDED_GENERATION.md
+# Implementation: src/generation/generator.py, src/generation/models.py
+
+contract_version: "1.0.0"
+
+generation_schema_version: "1.0.0"
+
+# Closed status vocabulary (docs Section N). Never a fourth ad hoc value.
+grounding_status_vocabulary: ["GROUNDED", "ABSTAINED", "GENERATION_FAILED"]
+
+# Closed abstention-reason vocabulary.
+abstention_reason_vocabulary: ["NO_EVIDENCE_AVAILABLE", "NO_VALID_CITATIONS_PRODUCED"]
+
+# The LLM is never the source of truth. Evidence (Phase 8) is. This
+# contract only ever transforms already-trusted Evidence into readable
+# text, and re-validates every claimed citation via Phase 9 before it can
+# appear in a final response.
+core_safety_principle: "EVIDENCE_IS_THE_SOURCE_OF_TRUTH_NOT_THE_LLM"
+
+# citation.models.CitationReference / citation.validator.validate_citations
+# are reused verbatim - Phase 10 never re-implements evidence-ID
+# resolution, evidence integrity verification, or EvidencePack validation.
+citation_validation_reuse: "PHASE_9_VALIDATOR_REUSED_VERBATIM_NEVER_DUPLICATED"
+
+# [OUR ENHANCEMENT] The citation-marker convention a provider must use to
+# cite evidence inline in free text. Not established by the Master
+# Reference - a Phase 10 design choice, documented as such.
+citation_marker_syntax: "[[CITE:<evidence_id>]]"
+
+# Provider selection is always explicit - the caller passes a concrete
+# GenerationProvider instance. Nothing in src/generation/ chooses,
+# guesses, or silently falls back to a different provider.
+provider_selection_policy: "EXPLICIT_CALLER_SUPPLIED_PROVIDER_NEVER_AUTO_SELECTED_NEVER_SILENT_FALLBACK"
+
+# [DEFERRED]/[ASSUMPTION] Live Gemini Flash / local Qwen2.5-3B adapters
+# are not implemented in this phase - neither API credentials nor a
+# downloaded model can be assumed present in this environment. Only the
+# abstract GenerationProvider interface and a deterministic
+# FakeGenerationProvider exist.
+live_provider_status: "DEFERRED_NO_CREDENTIAL_OR_MODEL_ASSUMED"
+
+# The conservative grounding decision rule (docs Section N/O). No
+# semantic claim/evidence entailment (NLI, embedding similarity, LLM
+# judge) is implemented anywhere in this phase.
+grounding_decision_rule:
+  - "No usable evidence (empty pack, or pack fails Phase 9 validity check) -> ABSTAINED/NO_EVIDENCE_AVAILABLE. Provider is never called."
+  - "Provider raises, returns a malformed output type, or reports success=false -> GENERATION_FAILED."
+  - "Provider succeeds but zero of its claimed citations survive Phase 9 validation (and require_citations=true, the default) -> ABSTAINED/NO_VALID_CITATIONS_PRODUCED."
+  - "Provider succeeds and at least one claimed citation survives Phase 9 validation (or require_citations=false) -> GROUNDED."
+
+semantic_entailment_status: "NOT_IMPLEMENTED_DEFERRED_NO_NLI_NO_EMBEDDING_JUDGE_NO_LLM_JUDGE"
+
+out_of_scope:
+  - "Formulation classification (Phase 11)."
+  - "Jurisdiction firewall (Phase 12)."
+  - "A project-wide confidence-scoring/abstention framework beyond the 3-way grounding decision above (Phase 13)."
+  - "Multilingual delivery / translation (Phase 14)."
+  - "Human-in-the-loop escalation workflow (Phase 15)."
+  - "A project-wide evaluation/red-team benchmark framework (Phase 16)."
+  - "Backend productization / FastAPI (Phase 17), frontend (Phase 18), deployment/observability/CI-CD/production validation (Phases 19-23)."
+
+safety_invariants:
+  - id: "GENERATION-SAFE-01"
+    rule: "A citation string a provider emits becomes a final cited_evidence_id only after passing Phase 9's validate_citations - a fabricated or unresolved citation can never appear in cited_evidence_ids."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-02"
+    rule: "The provider is never called against an empty or Phase-9-invalid EvidencePack - the system abstains before any generation attempt."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-03"
+    rule: "answer_text is populated if and only if grounding_status is GROUNDED - an abstained or failed response never carries fabricated or partial answer text."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-04"
+    rule: "A provider exception, malformed output type, or reported failure is surfaced as GENERATION_FAILED - never silently swallowed, never silently retried with a different provider."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-05"
+    rule: "Text embedded in evidence_text (including instruction-shaped text) is never executed or obeyed as instructions by anything in src/generation/ - it is passed into the prompt strictly as delimited data."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-06"
+    rule: "GenerationOutput.metadata may never contain a credential-shaped key (api_key/credential/secret/token/password substrings) - enforced structurally at construction, not merely documented."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-07"
+    rule: "response_id is a deterministic SHA-256 hash of the response's own canonical fields - never a random UUID, never derived from anything outside this system's control."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "GENERATION-SAFE-08"
+    rule: "synthetic=true evidence anywhere in the EvidencePack is reflected as synthetic=true on the response - never presented as a real regulatory source."
+    source_label: "[ENGINEERING RECOMMENDATION]"

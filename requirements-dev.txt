@@ -1,0 +1,204 @@
+# Project-control / testing infrastructure dependencies only.
+# Justification (per docs/DEVELOPMENT_RULES.md, Rule 6 "No Premature Dependencies"):
+# these are needed to test Phase 0's acceptance-contract machinery and are not
+# heavyweight AI/ML dependencies. Nothing beyond this file is installed for
+# Phase 0. Pin to the major versions actually present and verified working
+# in this environment at Phase 0 time.
+
+pytest>=9,<10
+PyYAML>=6,<7
+
+# --- Phase 3: Document Ingestion & Legal Structure Extraction ---
+# pypdf: lightweight, pure-Python, deterministic PDF text/page extraction
+# library. No ML/embedding/OCR components. Justification:
+#   1. Standard library insufficiency: Python's stdlib has no PDF parser at
+#      all; PDF/HTML parsing is explicitly named in the Master Reference's
+#      own Phase 3 build scope ("PDF/HTML parsing, headings, sections,
+#      subsections, clauses, tables, page numbers, dates and provenance").
+#   2. Lightweight/deterministic: pure-Python, no native/C extensions, no
+#      network calls, no model weights; extraction is a deterministic
+#      function of input bytes.
+#   3. Scope: used only by src/ingestion/extractors.py for per-page text
+#      extraction and page-boundary/parse-failure detection. It performs
+#      no chunking, embedding, retrieval, or generation - those remain
+#      strictly out of scope for Phase 3 and are owned by later phases.
+#   4. HTML parsing uses only the Python standard library (html.parser) -
+#      no new dependency was needed for HTML support.
+pypdf>=6,<7
+
+# --- Phase 4: Legal-Aware Chunking ---
+# No new dependency. src/chunking/ uses only the Python standard library
+# (dataclasses, hashlib, json, typing) - deterministic chunk identity and
+# splitting need nothing beyond that (docs/PHASE_04_LEGAL_AWARE_CHUNKING.md
+# Section G explains why a tokenizer dependency was deliberately not added).
+
+# --- Phase 5: BM25 Retrieval Baseline ---
+# No new dependency. src/retrieval/ uses only the Python standard library
+# (re-free: unicodedata, math, hashlib, json, collections, dataclasses).
+# rank_bm25 was deliberately not installed - a small self-contained BM25
+# implementation keeps parameters (k1, b) explicit and deterministic
+# behavior easy to test, per docs/PHASE_05_BM25_BASELINE.md Section R.
+
+# --- Phase 6: Multilingual Dense Retrieval ---
+# Three new dependencies, each directly required and unavoidable for THIS
+# phase's own build scope (docs/PHASE_06_MULTILINGUAL_DENSE_RETRIEVAL.md
+# Section E/F/G):
+#   1. sentence-transformers: the standard, well-maintained Python API for
+#      running BGE-M3 (and other Hugging Face sentence-embedding models)
+#      for both document and query embedding, with explicit device
+#      selection (CPU/GPU) and batch encoding built in. Used only by
+#      src/retrieval/embeddings.SentenceTransformerEmbeddingModel. Pulls in
+#      torch/transformers transitively (heavy, but unavoidable for any
+#      transformer-based embedding model on this stack) - their exact
+#      versions are governed by sentence-transformers' own dependency
+#      constraints, not pinned separately here.
+#   2. faiss-cpu: the CPU-only build of FAISS, the vector-similarity search
+#      library the Master Reference names for laptop-oriented dense
+#      indexing (docs/MASTER_REFERENCE_LOCK.md Section E). faiss-cpu (not
+#      faiss-gpu) matches this project's CPU-first hardware discipline
+#      (docs/DEVELOPMENT_RULES.md Rule 11) - GPU FAISS is explicitly
+#      deferred (docs/PHASE_06_MULTILINGUAL_DENSE_RETRIEVAL.md Section V).
+#      Used only by src/retrieval/faiss_index.py.
+#   3. numpy: required to hold/manipulate embedding vectors as arrays
+#      before handing them to FAISS - already an unavoidable transitive
+#      dependency of faiss-cpu itself; declared directly here because
+#      src/retrieval/embeddings.py and faiss_index.py import it directly.
+# All three verified importable/working in this environment at Phase 6
+# time (sentence-transformers 6.0.0, faiss-cpu 1.15.0, numpy 2.2.6).
+sentence-transformers>=6,<7
+faiss-cpu>=1,<2
+numpy>=2,<3
+
+# --- Phase 7: Hybrid Fusion + Reranking ---
+# No new dependency. `sentence_transformers.CrossEncoder` (the class Phase 7's
+# CrossEncoderReranker uses for the real bge-reranker-v2-m3 path) is already
+# part of the sentence-transformers package declared for Phase 6 above -
+# verified importable in this environment (docs/PHASE_07_HYBRID_FUSION_AND_RERANKING.md
+# Section M). RRF fusion itself (src/retrieval/rrf.py) uses only the Python
+# standard library (math).
+
+# --- Phase 8: Evidence Object + Citation Architecture ---
+# No new dependency. src/evidence/ uses only the Python standard library
+# (dataclasses, hashlib, json, math, typing) - deterministic evidence/pack
+# identity and integrity verification need nothing beyond that. No LLM SDK,
+# agent framework, or web framework was needed or added
+# (docs/PHASE_08_EVIDENCE_OBJECT_AND_CITATION_ARCHITECTURE.md Section C).
+
+# --- Phase 9: Citation Validation ---
+# No new dependency. src/citation/ uses only the Python standard library
+# (dataclasses, json, typing) plus Phase 8's own src/evidence/ module
+# (reused, not duplicated, for exact-match resolution, evidence integrity,
+# and EvidencePack integrity verification). No LLM SDK, agent framework,
+# or web framework was needed or added - citation validation is 100%
+# deterministic (docs/PHASE_09_CITATION_VALIDATION.md Section C).
+
+# --- Phase 10: Grounded Generation ---
+# No new dependency. src/generation/ uses only the Python standard
+# library (dataclasses, hashlib, json, re, abc, typing) plus Phase 8's
+# evidence.* and Phase 9's citation.* modules (reused, not duplicated).
+# No LLM SDK (no google-generativeai, no local-model runtime such as
+# transformers/llama-cpp-python) is added in this phase - live Gemini/Qwen
+# provider adapters are explicitly [DEFERRED] since neither API
+# credentials nor a downloaded model can be assumed present in this
+# environment; only the abstract GenerationProvider interface and a
+# deterministic, offline FakeGenerationProvider are implemented
+# (docs/PHASE_10_GROUNDED_GENERATION.md Sections K, L, M).
+
+# --- Phase 11: Formulation Classification Engine ---
+# No new dependency. src/classification/ uses only the Python standard
+# library (dataclasses, typing, json) - deterministic keyword-based
+# extraction plus Phase 1's own decision-tree semantics (reused, not
+# redesigned) need nothing beyond that. No LLM is used as the
+# authoritative classifier (docs/PHASE_11_FORMULATION_CLASSIFICATION.md
+# Section J) - no embeddings, no FAISS, no external API, no network
+# access anywhere in this phase.
+
+# --- Phase 12: Jurisdiction Firewall ---
+# No new dependency. src/jurisdiction/ uses only the Python standard
+# library (dataclasses, hashlib, typing, json) plus Phase 11's
+# classification.models.ClassificationResult (reused, read-only) - no
+# geolocation library, no country database, no LLM, no network access
+# anywhere in this phase (docs/PHASE_12_JURISDICTION_FIREWALL.md
+# Sections Q/R/S/T).
+
+# --- Phase 13: Confidence + Safety + Abstention ---
+# No new dependency. src/safety/ uses only the Python standard library
+# (dataclasses, hashlib, math, typing, json) plus Phase 9's
+# citation.metrics.CitationCoverageMetrics, Phase 10's
+# generation.models.GroundedResponse, Phase 11's
+# classification.models.ClassificationResult, and Phase 12's
+# jurisdiction.models.JurisdictionDecision (all reused, read-only,
+# never recomputed or duplicated). No LLM, no embeddings, no network
+# access anywhere in this phase
+# (docs/PHASE_13_CONFIDENCE_SAFETY_ABSTENTION.md Sections D, Y).
+
+# --- Phase 14: Multilingual Delivery ---
+# No new dependency. src/multilingual/ uses only the Python standard
+# library (dataclasses, hashlib, unicodedata, abc, typing, json) plus
+# Phase 10's generation.models.GroundedResponse and Phase 13's
+# safety.models.SafetyDecision (reused, read-only, never overridden).
+# Script detection is Unicode-codepoint-range arithmetic (stdlib);
+# canonicalization is stdlib `unicodedata.normalize("NFC", ...)`. No
+# language-detection library, no Bhashini SDK, no LLM, no network access
+# anywhere in this phase - a live translation adapter is explicitly
+# [DEFERRED] (docs/PHASE_14_MULTILINGUAL_DELIVERY.md Sections K, N, P).
+
+# --- Phase 16: Evaluation + Red-Team Benchmark ---
+# No new dependency. src/evaluation/ uses only the Python standard
+# library (dataclasses, hashlib, json, math, typing) plus the real Phase
+# 5-15 modules it measures (retrieval.evaluation, citation.metrics,
+# classification.classifier, jurisdiction.firewall/filtering,
+# safety.evaluator, multilingual.delivery/preservation, review.policy/
+# workflow - all called from the test layer, never reimplemented here).
+# No LLM, no network, no ML/statistics library, no database anywhere in
+# this phase (docs/PHASE_16_EVALUATION_AND_RED_TEAM.md Sections B, C).
+
+# --- Phase 15: Human-in-the-Loop ---
+# No new dependency. src/review/ uses only the Python standard library
+# (dataclasses, hashlib, json, typing) plus Phase 8's evidence.models
+# (EvidencePack membership check only), Phase 9's citation.models
+# (CitationValidationResult type check only), Phase 10's
+# generation.models.GroundedResponse, Phase 11's
+# classification.models.ClassificationResult, Phase 12's
+# jurisdiction.models.JurisdictionDecision, Phase 13's
+# safety.models.SafetyDecision, and Phase 14's
+# multilingual.models.MultilingualDeliveryResult (all reused, read-only,
+# never mutated or duplicated). No LLM, no network access, no
+# authentication library, no FastAPI, no React anywhere in this phase
+# (docs/PHASE_15_HUMAN_IN_THE_LOOP.md Sections B, C, T).
+
+# --- Phase 17: Backend Productization ---
+# Three new runtime dependencies, each directly required for THIS phase's
+# own build scope (docs/PHASE_17_BACKEND_PRODUCTIZATION.md Sections D, AE):
+#   1. fastapi: the HTTP/API transport boundary named explicitly by this
+#      phase's own instructions. Already installed and verified working
+#      in this environment at Phase 17 time (0.136.0) - pinned by minor
+#      version since FastAPI is still pre-1.0 and can break between
+#      minors. Used only by src/api/ for request parsing, response
+#      serialization, HTTP status mapping, dependency wiring, exception
+#      translation, and OpenAPI generation - never for business logic.
+#   2. pydantic: FastAPI's own required request/response validation
+#      library (a transitive dependency of fastapi regardless; declared
+#      directly here because src/api/schemas.py imports it directly).
+#      Pinned by major version (2.x), matching this project's own
+#      numpy/faiss-cpu convention, since Pydantic 2.x maintains strong
+#      inter-minor API stability. Verified working at 2.13.2.
+#   3. uvicorn: the minimal ASGI server needed to actually RUN the
+#      FastAPI app outside of tests (tests use FastAPI's own TestClient,
+#      which does not require a running server). No production
+#      deployment configuration (reverse proxy, TLS, process manager) is
+#      implemented anywhere in this phase - that remains Phase 20's own
+#      scope. Verified working at 0.42.0.
+# One new TEST-ONLY dependency:
+#   4. httpx: required transitively by FastAPI's own `TestClient`
+#      (starlette.testclient) to make in-process HTTP calls without a
+#      real network socket - never used for a real outbound network
+#      request anywhere in this project. Verified working at 0.28.1.
+# No ORM, no database driver, no authentication framework, no task
+# queue, no Redis, no Celery, no message broker, and no monitoring stack
+# is added anywhere in this phase (docs Section AE) - none is required by
+# any existing contract, and Phase 17 remains stateless.
+fastapi>=0.136,<0.137
+pydantic>=2,<3
+uvicorn>=0.42,<0.43
+httpx>=0.28,<0.29

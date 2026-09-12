@@ -1,0 +1,318 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 1 machine-readable domain taxonomy.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_01_DOMAIN_TAXONOMY.md
+#
+# Every category has: id, name, description, status, source_label.
+# status vocabulary: DEFINED (contract-defined, not yet consumed by a
+#   working classification engine - that is Phase 11's job).
+
+taxonomy_version: "1.0.0"
+
+dimensions:
+
+  regulatory_track:
+    description: >
+      Which regulatory branch a formulation/product falls under. Named
+      exactly as the Master Reference names them; no finer legal
+      subcategory is introduced.
+    categories:
+      - id: "RT-01"
+        name: "CLASSICAL_AYURVEDIC_DRUG"
+        description: "Classical Ayurvedic drug branch, as named in the Master Reference Phase 1 build scope."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "RT-02"
+        name: "PROPRIETARY_AYURVEDIC_DRUG"
+        description: "Proprietary Ayurvedic drug branch, as named in the Master Reference Phase 1 build scope."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "RT-03"
+        name: "NEW_AYURVEDIC_DRUG"
+        description: "New Ayurvedic drug branch, as named in the Master Reference Phase 1 build scope."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "RT-04"
+        name: "AYURVEDA_AAHARA_FOOD"
+        description: "Ayurveda Aahara / food-law branch (FSSAI), explicitly distinguished from Ayurvedic drugs by the Master Reference."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "RT-05"
+        name: "COSMETIC"
+        description: "Cosmetic branch, as named in the Master Reference Phase 1 build scope."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "RT-06"
+        name: "PHYTOPHARMACEUTICAL"
+        description: "Phytopharmaceutical branch, as named in the Master Reference Phase 1 build scope."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "RT-07"
+        name: "UNDETERMINED"
+        description: "No regulatory-track signal was supplied by the input."
+        status: "DEFINED"
+        source_label: "[ENGINEERING RECOMMENDATION]"
+      - id: "RT-08"
+        name: "CONFLICTING"
+        description: "More than one regulatory-track branch was signaled with no deterministic tiebreak."
+        status: "DEFINED"
+        source_label: "[ENGINEERING RECOMMENDATION]"
+
+  ip_protection_category:
+    description: >
+      IP protection category relevant to a question, named after the IP
+      India source family's stated scope.
+    categories:
+      - id: "IP-01"
+        name: "PATENT"
+        description: "Patent protection, per the IP India source family."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "IP-02"
+        name: "TRADEMARK"
+        description: "Trademark protection, per the IP India source family."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "IP-03"
+        name: "DESIGN"
+        description: "Design protection, per the IP India source family."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "IP-04"
+        name: "GEOGRAPHICAL_INDICATION"
+        description: "Geographical Indication (GI) protection, per the IP India source family."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "IP-05"
+        name: "NONE"
+        description: "The question is not IP-protection-related."
+        status: "DEFINED"
+        source_label: "[ENGINEERING RECOMMENDATION]"
+      - id: "IP-06"
+        name: "UNDETERMINED"
+        description: "Insufficient input to determine an IP protection category."
+        status: "DEFINED"
+        source_label: "[ENGINEERING RECOMMENDATION]"
+
+  abs_tk_relation:
+    description: >
+      Whether a question relates to Access and Benefit Sharing (ABS) or
+      Traditional Knowledge (TK) concepts named in the Master Reference.
+    categories:
+      - id: "ATK-01"
+        name: "TRADITIONAL_KNOWLEDGE_RELATED"
+        description: "Relates to traditional knowledge concepts (WIPO GRATK)."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "ATK-02"
+        name: "ACCESS_AND_BENEFIT_SHARING_RELATED"
+        description: "Relates to access and benefit sharing / genetic resources concepts (WIPO GRATK)."
+        status: "DEFINED"
+        source_label: "[OFFICIAL SOURCE]"
+      - id: "ATK-03"
+        name: "NOT_RELATED"
+        description: "Not related to ABS/TK concepts."
+        status: "DEFINED"
+        source_label: "[ENGINEERING RECOMMENDATION]"
+      - id: "ATK-04"
+        name: "UNDETERMINED"
+        description: "Insufficient input to determine ABS/TK relation."
+        status: "DEFINED"
+        source_label: "[ENGINEERING RECOMMENDATION]"
+
+regulatory_question_categories:
+  description: >
+    Which authoritative source family a regulatory question maps to.
+    Derived 1:1 from the Authoritative Source Strategy table's "Source
+    family" column.
+  categories:
+    - id: "RQ-01"
+      name: "INDIA_LEGISLATIVE"
+      description: "Acts, sections, rules, regulations, notifications (India Code)."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-02"
+      name: "IP_REGISTRATION_AND_SEARCH"
+      description: "Patents, trademarks, designs, GI and related public search/e-services (IP India)."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-03"
+      name: "AYUSH_POLICY"
+      description: "Ayush policy, programmes and official Ayurveda-related material (Ministry of Ayush)."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-04"
+      name: "TRADITIONAL_DRUG_REGULATION"
+      description: "Traditional drugs and Drugs & Cosmetics Rules (CDSCO)."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-05"
+      name: "AYURVEDA_AAHARA_FOOD_LAW"
+      description: "Ayurveda Aahara regulations and related food-law material (FSSAI)."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-06"
+      name: "INTERNATIONAL_IP_TREATY"
+      description: "International IP treaties, traditional knowledge and genetic-resources material (WIPO / WIPO Lex)."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-07"
+      name: "TRADITIONAL_KNOWLEDGE_DATABASE"
+      description: "Authorized/publicly accessible material only (TKDL); no assumed protected full-database access."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "RQ-08"
+      name: "UNDETERMINED"
+      description: "Question does not map to any registered source family."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+
+user_intent_categories:
+  description: >
+    Engineering-derived intent categories (the Master Reference names
+    "intended-use questions" as in-scope but does not enumerate specific
+    categories).
+  categories:
+    - id: "UI-01"
+      name: "DETERMINE_REGULATORY_CLASSIFICATION"
+      description: "What regulatory category does my formulation/product fall under?"
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: true
+    - id: "UI-02"
+      name: "DETERMINE_IP_PROTECTION_PATHWAY"
+      description: "How can this be protected as IP / what protection applies?"
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: true
+    - id: "UI-03"
+      name: "CHECK_COMPLIANCE_REQUIREMENT"
+      description: "What rules/requirements apply given a known category?"
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: true
+    - id: "UI-04"
+      name: "LOOKUP_AUTHORITATIVE_SOURCE"
+      description: "What does a specific law/regulation/notification say?"
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: true
+    - id: "UI-05"
+      name: "GENERAL_INFORMATION_REQUEST"
+      description: "Informational question not requiring an evidence-backed regulatory conclusion."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: false
+    - id: "UI-06"
+      name: "OUT_OF_SCOPE_OR_UNSUPPORTED"
+      description: "Falls outside the locked source strategy / domain entirely."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: false
+    - id: "UI-07"
+      name: "AMBIGUOUS_INTENT"
+      description: "Input signals more than one intent with no deterministic tiebreak."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: false
+    - id: "UI-08"
+      name: "UNDETERMINED"
+      description: "No intent signal supplied."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+      evidence_requiring: false
+
+jurisdiction_inputs:
+  description: >
+    Jurisdiction classification-input values. Does not implement firewall
+    enforcement (Phase 12 owns that); only fixes the vocabulary.
+  categories:
+    - id: "JX-01"
+      name: "INDIA"
+      description: "Question concerns Indian jurisdiction."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "JX-02"
+      name: "INTERNATIONAL"
+      description: "Question concerns international/non-Indian jurisdiction."
+      status: "DEFINED"
+      source_label: "[OFFICIAL SOURCE]"
+    - id: "JX-03"
+      name: "BOTH"
+      description: "Question legitimately spans both India and international jurisdiction."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "JX-04"
+      name: "UNSPECIFIED"
+      description: "Jurisdiction has not been provided."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+
+evidence_states:
+  description: >
+    Whether authoritative evidence (Phase 2+ corpus) backs a conclusion.
+    NOT_YET_EVALUATED is the only truthful value obtainable prior to
+    Phase 2 being implemented.
+  categories:
+    - id: "EV-01"
+      name: "SUFFICIENT_EVIDENCE"
+      description: "Retrieved evidence supports a defensible answer."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "EV-02"
+      name: "INSUFFICIENT_EVIDENCE"
+      description: "Evidence was checked but does not support a confident answer."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "EV-03"
+      name: "NO_EVIDENCE_AVAILABLE"
+      description: "No matching evidence exists in the corpus."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "EV-04"
+      name: "NOT_YET_EVALUATED"
+      description: "No evidence check has been performed yet (expected value prior to Phase 2)."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+
+classification_states:
+  description: >
+    Terminal states of the regulatory decision tree (see
+    config/regulatory_decision_tree.yaml and
+    docs/PHASE_01_REGULATORY_DECISION_TREE.md).
+  categories:
+    - id: "CS-01"
+      name: "KNOWN"
+      description: "Engineering-routing conclusion reached; not a legal determination."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "CS-02"
+      name: "UNKNOWN"
+      description: "A required input dimension is missing or unrecognized."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "CS-03"
+      name: "AMBIGUOUS"
+      description: "Input dimensions conflict with no deterministic tiebreak."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+    - id: "CS-04"
+      name: "NEEDS_EVIDENCE"
+      description: "Inputs are complete and unambiguous but the intent requires evidence not yet confirmed sufficient."
+      status: "DEFINED"
+      source_label: "[ENGINEERING RECOMMENDATION]"
+
+explainability_requirements:
+  - id: "EXP-01"
+    requirement: "Every classification result includes reason_codes identifying the specific rule(s) that produced it."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EXP-02"
+    requirement: "Every classification result includes basis (taxonomy/rule IDs consulted) for audit and traceability."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EXP-03"
+    requirement: "Every classification result includes a non-empty human-readable explanation string."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EXP-04"
+    requirement: "No classification result may be produced by an LLM call, external API call, or opaque model inference."
+    source_label: "[OFFICIAL SOURCE]"

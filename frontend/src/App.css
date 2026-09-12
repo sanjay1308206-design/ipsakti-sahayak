@@ -1,0 +1,297 @@
+.app-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px clamp(16px, 4vw, 32px) 48px;
+}
+
+.app-header h1 {
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  margin: 24px 0 4px;
+}
+
+.app-subtitle {
+  color: var(--text);
+  max-width: 65ch;
+  margin: 0 0 24px;
+}
+
+/* --- Query form --- */
+
+.query-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: clamp(16px, 3vw, 24px);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.form-field textarea,
+.form-field select {
+  font: inherit;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  resize: vertical;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.form-row .form-field {
+  flex: 1 1 200px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.form-actions button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.form-actions button[type="submit"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.form-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.field-error {
+  color: var(--escalate);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.loading-indicator {
+  margin-top: 16px;
+  font-style: italic;
+}
+
+/* --- Results / panels --- */
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: clamp(14px, 3vw, 20px);
+}
+
+.panel h2 {
+  font-size: 1.1rem;
+  margin: 0 0 12px;
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 600px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+}
+
+dl > div {
+  display: contents;
+}
+
+dt {
+  font-weight: 600;
+  color: var(--text);
+}
+
+dd {
+  margin: 0;
+}
+
+/* --- Status banner --- */
+
+.status-banner {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 16px;
+}
+
+.status-banner .status-label {
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.status-explanation {
+  margin-bottom: 12px;
+}
+
+.status-detail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: grid;
+  gap: 8px;
+}
+
+.status-detail-grid dt {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-safe {
+  background: var(--safe-bg);
+  border-color: var(--safe);
+}
+.status-safe .status-label {
+  color: var(--safe);
+}
+
+.status-abstain {
+  background: var(--abstain-bg);
+  border-color: var(--abstain);
+}
+.status-abstain .status-label {
+  color: var(--abstain);
+}
+
+.status-escalate {
+  background: var(--escalate-bg);
+  border-color: var(--escalate);
+}
+.status-escalate .status-label {
+  color: var(--escalate);
+}
+
+.status-warn {
+  background: var(--warn-bg);
+  border-color: var(--warn);
+}
+.status-warn .status-label {
+  color: var(--warn);
+}
+
+/* --- Answer --- */
+
+.answer-text {
+  white-space: pre-wrap;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.answer-meta {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.answer-empty {
+  font-style: italic;
+  color: var(--text);
+}
+
+/* --- Citations / evidence --- */
+
+.citation-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.citation-unresolved-notice,
+.evidence-gap-notice {
+  font-size: 0.9rem;
+  background: var(--code-bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.citation-list,
+.evidence-list,
+.review-reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evidence-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.evidence-card-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text);
+}
+
+.citation-empty,
+.evidence-empty {
+  font-style: italic;
+}
+
+/* --- Review --- */
+
+.review-request-id {
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+/* --- Error --- */
+
+.error-panel {
+  border-color: var(--escalate);
+  background: var(--escalate-bg);
+}
+
+.error-panel h2 {
+  color: var(--escalate);
+}

@@ -1,0 +1,62 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 6 machine-readable dense retrieval contract (embedding/index/config
+# semantics), mirroring config/bm25_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_06_MULTILINGUAL_DENSE_RETRIEVAL.md
+# Implementation: src/retrieval/faiss_index.py, src/retrieval/embeddings.py
+
+contract_version: "1.0.0"
+
+# [OFFICIAL SOURCE] docs/MASTER_REFERENCE_LOCK.md Section E names BGE-M3 as
+# the dense-retrieval embedding candidate (CPU candidate).
+default_embedding_model: "BAAI/bge-m3"
+
+default_device: "cpu"  # [ENGINEERING RECOMMENDATION] hardware-safe default; see docs Section G/H
+
+similarity_strategy: "COSINE_VIA_NORMALIZED_INNER_PRODUCT"
+
+faiss_index_type: "FLAT_IP"  # [ENGINEERING RECOMMENDATION] see docs Section K - IVF/HNSW/PQ/GPU explicitly deferred
+
+supported_faiss_index_types: ["FLAT_IP"]
+
+accepted_input_type: "list[chunking.models.Chunk]"
+
+# No stopword/tokenizer policy at the dense layer - the embedding model
+# consumes whole text; docs Section I explains why there is no per-token
+# "normalized query representation" the way Phase 5's BM25 has one.
+
+output_requirements:
+  - "An index/result serialization, if produced, must be deterministic JSON (sort_keys, fixed separators, UTF-8) for the metadata sidecar, plus FAISS's own native binary format for the vector index itself - never a single pickled blob."
+  - "Every DenseRetrievalResult must preserve document_id, source_family_id, jurisdiction, content_hash, page_numbers, and block_ids unchanged from the originating Phase 4 Chunk."
+  - "Dense similarity score must never be represented as, or accepted as, legal authority, citation validity, regulatory correctness, or confidence in a legal conclusion (Phase 8/9/13 own those concerns)."
+  - "synthetic must be propagated unchanged onto every DenseRetrievalResult."
+  - "model_identity must be recorded on every built index and every retrieval result - no silent model substitution."
+
+determinism_requirements:
+  - "Index build order (chunk_ids, chunk_provenance) matches the input chunk list order exactly - never re-sorted, never derived from dict/set iteration order."
+  - "Ranking ties are broken by ascending chunk_id after descending score - never FAISS's raw, implementation-defined tie order, insertion order, random order, timestamps, or memory addresses."
+  - "Running build_dense_index() and dense_query() repeatedly on identical input (same embedding model, same config, same chunks, same query) produces identical index statistics, scores, ordering, and serialized JSON."
+
+safety_invariants:
+  - id: "DENSE-SAFE-01"
+    rule: "Every DenseRetrievalResult traces back to at least one block_id and page_number, and carries the source document's document_id/source_family_id/jurisdiction/content_hash unchanged - a retrieval result must never become a detached text fragment."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "DENSE-SAFE-02"
+    rule: "Unlike Phase 5's BM25 (which excludes exact-zero-score chunks), dense retrieval returns min(top_k, chunk_count) results always - every embedding has SOME cosine similarity to a query, and a low score is a weak-match signal, never silently reinterpreted as 'no evidence'."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "DENSE-SAFE-03"
+    rule: "build_dense_index() rejects duplicate chunk_id values and non-Chunk input with a typed exception rather than silently producing a corrupt or ambiguous index."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "DENSE-SAFE-04"
+    rule: "dense_query() rejects a non-positive or non-integer top_k, and rejects an embedding_model whose model_identity or dimension does not match the index it is queried against, with a typed exception rather than silently producing meaningless similarity scores."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "DENSE-SAFE-05"
+    rule: "Embedding vectors are validated finite (no NaN/Inf) and of the expected shape/dimension before being added to, or queried against, a FAISS index; a violation raises a typed exception rather than corrupting the index silently."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "DENSE-SAFE-06"
+    rule: "A persisted dense index that is missing, corrupted, or internally inconsistent (dimension/vector-count/signature mismatch) fails to load with a typed exception rather than silently producing a usable-looking but misleading index."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "DENSE-SAFE-07"
+    rule: "The dense index/score never implements, and is never presented as, the jurisdiction firewall (Phase 12) - jurisdiction is preserved as passthrough metadata only, exactly as Phase 5's BM25 layer already does."
+    source_label: "[ENGINEERING RECOMMENDATION]"

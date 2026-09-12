@@ -1,0 +1,98 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 9 machine-readable citation-validation contract, mirroring
+# config/evidence_contract.yaml's structure.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_09_CITATION_VALIDATION.md
+# Implementation: src/citation/validator.py, src/citation/models.py
+
+contract_version: "1.0.0"
+
+citation_reference_schema_version: "1.0.0"
+citation_result_schema_version: "1.0.0"
+citation_metrics_schema_version: "1.0.0"
+
+# Closed status vocabulary (docs Section H). Never a fourth ad hoc value.
+status_vocabulary: ["VALID", "INVALID", "UNRESOLVED"]
+
+# Closed reason-code vocabulary (docs Section I). "duplicate_reference"
+# and "synthetic_evidence" are deliberately NOT reason codes - neither
+# condition is by itself a validation failure. "unsupported_reference_type"
+# is deliberately absent - exactly one evidence type ("CHUNK") and exactly
+# one reference mechanism (evidence_id) exist as of Phase 8/9.
+reason_code_vocabulary:
+  [
+    "EVIDENCE_ID_MISSING",
+    "MALFORMED_REFERENCE",
+    "SCHEMA_MISMATCH",
+    "EVIDENCE_NOT_FOUND",
+    "INVALID_PACK",
+    "EVIDENCE_INTEGRITY_FAILURE",
+    "EVIDENCE_PROVENANCE_FAILURE",
+  ]
+
+# Evidence ID resolution is EXACT STRING EQUALITY ONLY. No fuzzy match,
+# no partial-ID match, no case folding, no whitespace trimming, no
+# source-name guessing, no page-number guessing, no text-similarity
+# fallback. Reuses evidence.builder.resolve_citation_target verbatim -
+# never a separately re-implemented lookup.
+resolution_policy: "EXACT_STRING_MATCH_ONLY_VIA_PHASE_8_RESOLVE_CITATION_TARGET"
+
+# The validator never mints, repairs, or guesses an evidence_id - the
+# single source of truth for evidence identity remains Phase 8
+# (config/evidence_contract.yaml, evidence_id_inputs).
+evidence_id_source_of_truth: "config/evidence_contract.yaml (Phase 8) - Phase 9 only resolves, never mints or repairs"
+
+# An EvidencePack must pass Phase 8's own verify_pack_integrity (plus a
+# schema-version check) BEFORE any citation in a batch is resolved
+# against it. A failing pack invalidates every citation checked against
+# it in that call - never partially trusted.
+pack_validation_policy: "EVIDENCEPACK_MUST_PASS_VALIDATION_BEFORE_ANY_CITATION_IS_RESOLVED_AGAINST_IT"
+
+# Repeated references to the same evidence_id string within one
+# validate_citations() call are flagged via is_duplicate_occurrence - never
+# merged into a single evidence identity, and never automatically INVALID.
+duplicate_policy: "SAME_EVIDENCE_ID_STRING_REPEATED_IN_ONE_CALL_IS_FLAGGED_NOT_MERGED_NOT_AUTOMATICALLY_INVALID"
+
+# synthetic=true evidence is not automatically invalid - it is preserved
+# on VALID results via ResolvedEvidenceSummary.synthetic, distinguishing
+# "synthetic but structurally valid" from "invalid evidence".
+synthetic_policy: "SYNTHETIC_EVIDENCE_IS_NOT_AUTOMATICALLY_INVALID_FLAG_IS_PRESERVED_ON_VALID_RESULTS"
+
+# Deterministic ordering (docs "CITATION ORDERING"): validate_citations()
+# preserves input occurrence order; never set/dict iteration order.
+ordering_policy: "PRESERVE_INPUT_OCCURRENCE_ORDER"
+
+# Explicitly out of scope for this phase - see docs Sections Q/V/W.
+out_of_scope:
+  - "Semantic claim-support / entailment validation (does evidence Y prove claim X) - [DEFERRED]."
+  - "Legal correctness, regulatory authority, or currentness determination."
+  - "URL construction, guessing, or resolution of any kind."
+  - "Generated-answer or claim generation (Phase 10's own scope)."
+  - "Formulation classification, jurisdiction firewall, confidence/abstention (Phases 11-13)."
+
+safety_invariants:
+  - id: "CITATION-SAFE-01"
+    rule: "Evidence ID resolution is exact-string-equality only - never fuzzy, partial, case-folded, or similarity-based."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SAFE-02"
+    rule: "A citation referencing a nonexistent evidence_id is reported UNRESOLVED (EVIDENCE_NOT_FOUND) - never silently repaired, guessed, or resolved to a nearby evidence item."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "CITATION-SAFE-03"
+    rule: "An EvidencePack that fails its own Phase 8 integrity/schema validation causes every citation validated against it to be reported INVALID (INVALID_PACK) - never partially trusted."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SAFE-04"
+    rule: "A resolved Evidence object that fails Phase 8 text/identity integrity verification causes its citation to be reported INVALID (EVIDENCE_INTEGRITY_FAILURE) - never VALID."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SAFE-05"
+    rule: "Repeated references to the same evidence_id never create multiple evidence identities and are never treated as automatically invalid - occurrence is tracked separately from validity."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SAFE-06"
+    rule: "synthetic=true evidence resolves to VALID exactly like non-synthetic evidence when structurally sound - the synthetic flag is preserved, never used to force INVALID."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SAFE-07"
+    rule: "Citation reference content and evidence text are treated strictly as data - never executed, never interpreted as configuration, never able to alter validator behavior, evidence selection, schema, or filesystem paths."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "CITATION-SAFE-08"
+    rule: "Validation never asserts semantic claim support, legal correctness, regulatory authority, or document currentness - it asserts citation-target integrity only."
+    source_label: "[OFFICIAL SOURCE]"

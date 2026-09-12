@@ -1,0 +1,177 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 8 machine-readable evidence/pack output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_08_EVIDENCE_OBJECT_AND_CITATION_ARCHITECTURE.md
+#
+# This is the SHAPE produced by src/evidence/serialize.evidence_to_json and
+# evidence_pack_to_json. It is not a generated-answer/citation-validation
+# schema (Phase 9+); it is Phase 8's deterministic, provenance-preserving
+# evidence representation.
+
+schema_version: "1.0.0"
+
+evidence_types: ["CHUNK"]
+
+evidence:
+  description: "The canonical evidence object. evidence_text is verbatim source/chunk text - never paraphrased, summarized, or rewritten."
+  fields:
+    - name: "evidence_id"
+      type: "string"
+      required: true
+      description: "Deterministic SHA-256 hex digest, backend-owned. Never a FAISS/BM25 position, a random UUID, or LLM output."
+    - name: "evidence_schema_version"
+      type: "string"
+      required: true
+    - name: "evidence_type"
+      type: "enum"
+      enum_ref: "evidence_types"
+      required: true
+    - name: "evidence_text"
+      type: "string"
+      required: true
+      description: "Verbatim candidate/chunk text."
+    - name: "evidence_text_hash"
+      type: "string"
+      required: true
+      description: "SHA-256 hex digest of evidence_text - tampering detectable by recomputation."
+    - name: "chunk_id"
+      type: "string"
+      required: true
+      description: "The underlying Phase 4 retrieval identity - never replaced by evidence_id internally."
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+      description: "Preserved unchanged - Phase 8 does not create a second competing authority hierarchy."
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+      description: "Preserved unchanged. Phase 8 does NOT implement the jurisdiction firewall (Phase 12 owns it)."
+    - name: "content_hash"
+      type: "string"
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+      description: "Propagated verbatim from the originating chunk/candidate (config/corpus_provenance_schema.yaml PROV-SAFE-01/05 lineage)."
+    - name: "page_numbers"
+      type: "list[integer]"
+      required: true
+      description: "Never empty - evidence must always trace back to at least one Phase 3 page."
+    - name: "block_ids"
+      type: "list[string]"
+      required: true
+      description: "Never empty - evidence must always trace back to at least one Phase 3 block."
+    - name: "retrieval_metadata"
+      type: "object"
+      required: true
+      description: "See retrieval_metadata section below. Kept explicitly separate from evidence identity/provenance."
+    - name: "version_info"
+      type: "object"
+      required: true
+      description: "See version_info section below. Always 'not available' as of Phase 8 - see docs Section T."
+    - name: "section_heading_text"
+      type: "string_or_null"
+      required: false
+      description: "Null unless the originating candidate happened to carry it - none of Phase 5/6/7's current result types do."
+    - name: "section_heading_level"
+      type: "integer_or_unknown_or_null"
+      required: false
+
+retrieval_metadata:
+  description: "Retrieval-signal metadata. None of these fields is legal confidence, regulatory authority, or citation validity."
+  fields:
+    - name: "rank"
+      type: "integer"
+      required: true
+    - name: "bm25_rank"
+      type: "integer_or_null"
+      required: false
+    - name: "bm25_score"
+      type: "number_or_null"
+      required: false
+    - name: "dense_rank"
+      type: "integer_or_null"
+      required: false
+    - name: "dense_score"
+      type: "number_or_null"
+      required: false
+    - name: "dense_model_identity"
+      type: "string_or_null"
+      required: false
+    - name: "rrf_score"
+      type: "number_or_null"
+      required: false
+    - name: "reranker_score"
+      type: "number_or_null"
+      required: false
+    - name: "reranker_model_identity"
+      type: "string_or_null"
+      required: false
+
+version_info:
+  description: "Document version/effective-date/supersession metadata - always 'not available' for every Evidence object this phase can currently produce (docs Section T)."
+  fields:
+    - name: "version"
+      type: "string_or_null"
+      required: false
+    - name: "version_known"
+      type: "boolean"
+      required: true
+    - name: "effective_date"
+      type: "string_or_null"
+      required: false
+    - name: "effective_date_known"
+      type: "boolean"
+      required: true
+    - name: "publication_date"
+      type: "string_or_null"
+      required: false
+    - name: "supersession_status"
+      type: "string_or_null"
+      required: false
+
+citation_target:
+  description: "Points to exactly one Evidence ID. Contains no invented source data of its own."
+  fields:
+    - name: "evidence_id"
+      type: "string"
+      required: true
+    - name: "schema_version"
+      type: "string"
+      required: true
+
+evidence_pack:
+  description: "The final Phase 8 deliverable. Contains only real Evidence objects - never a generated answer, claim, LLM reasoning, or hallucinated citation."
+  fields:
+    - name: "pack_id"
+      type: "string"
+      required: true
+      description: "Deterministic SHA-256 hex digest - the pack's own identity/signature."
+    - name: "schema_version"
+      type: "string"
+      required: true
+    - name: "query"
+      type: "string"
+      required: true
+    - name: "evidence_items"
+      type: "list[evidence]"
+      required: true
+    - name: "construction_metadata"
+      type: "object"
+      required: true
+      description: "candidate_count, dropped_duplicate_chunk_id_count, after_filter_count, selected_count, max_evidence_items, max_rank, min_score, config_signature."
+
+safety_invariants:
+  - id: "EVIDENCE-SCHEMA-SAFE-01"
+    rule: "block_ids and page_numbers are never empty lists; every evidence object traces back to at least one Phase 3 block and page."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "EVIDENCE-SCHEMA-SAFE-02"
+    rule: "evidence_id is always a deterministic hash of authoritative provenance fields - never a FAISS/BM25 position or a generated display name."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVIDENCE-SCHEMA-SAFE-03"
+    rule: "retrieval_metadata fields are documented as relevance signals only, never legal authority, regulatory correctness, or citation validity."
+    source_label: "[ENGINEERING RECOMMENDATION]"

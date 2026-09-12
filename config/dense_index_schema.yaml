@@ -1,0 +1,130 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 6 machine-readable dense retrieval result/index-metadata output schema.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_06_MULTILINGUAL_DENSE_RETRIEVAL.md
+#
+# This is the SHAPE produced by src/retrieval/serialize.dense_response_to_json
+# and dense_index_metadata_to_json. It is not a citation/evidence schema
+# (Phase 8+); it is Phase 6's deterministic dense-retrieval-result and
+# index-metadata representation. The FAISS index's own vector data is
+# persisted separately in FAISS's native binary format - this schema
+# covers only the JSON-representable metadata/results.
+
+schema_version: "1.0.0"
+
+similarity_strategies: ["COSINE_VIA_NORMALIZED_INNER_PRODUCT"]
+
+dense_retrieval_response:
+  description: "Top-level result of one faiss_index.dense_query() call against a DenseIndex."
+  fields:
+    - name: "query"
+      type: "string"
+      required: true
+      description: "The original, unmodified query string as supplied by the caller."
+    - name: "top_k"
+      type: "integer"
+      required: true
+    - name: "index_signature"
+      type: "string"
+      required: true
+      description: "The DenseIndex this response was produced against - ties a result set to an exact corpus + model + parameter identity."
+    - name: "model_identity"
+      type: "string"
+      required: true
+      description: "The embedding model identity (e.g. 'BAAI/bge-m3') used for both the index and this query - never silently substituted."
+    - name: "results"
+      type: "list[dense_retrieval_result]"
+      required: true
+
+dense_retrieval_result:
+  description: "One ranked chunk. score is a cosine-similarity signal ONLY - never legal authority, citation validity, regulatory correctness, or confidence in a legal conclusion."
+  fields:
+    - name: "rank"
+      type: "integer"
+      required: true
+      description: "1-based position within this response's results list."
+    - name: "chunk_id"
+      type: "string"
+      required: true
+      description: "The originating Phase 4 chunk_id, unchanged - never re-derived, never a FAISS internal position or array index."
+    - name: "score"
+      type: "number"
+      required: true
+      description: "Cosine similarity (inner product of L2-normalized vectors), range approximately [-1, 1]. NOT evidence of legal authority; never to be used as, or confused with, a citation."
+    - name: "model_identity"
+      type: "string"
+      required: true
+    - name: "document_id"
+      type: "string"
+      required: true
+    - name: "source_family_id"
+      type: "string"
+      required: true
+      description: "Preserved unchanged from the Phase 4 chunk - never inferred from score, never reclassified here."
+    - name: "jurisdiction"
+      type: "string"
+      required: true
+      description: "Preserved unchanged from the Phase 4 chunk. Phase 6 does NOT implement the jurisdiction firewall (Phase 12 owns it) - this field is passthrough metadata only."
+    - name: "content_hash"
+      type: "string"
+      required: true
+    - name: "synthetic"
+      type: "boolean"
+      required: true
+      description: "Propagated verbatim from the Phase 4 chunk (config/corpus_provenance_schema.yaml PROV-SAFE-01/05 lineage)."
+    - name: "page_numbers"
+      type: "list[integer]"
+      required: true
+    - name: "block_ids"
+      type: "list[string]"
+      required: true
+      description: "Never empty - a retrieval result must always trace back to at least one Phase 3 block."
+    - name: "chunk_text"
+      type: "string"
+      required: true
+      description: "Verbatim copy of the originating chunk's text. Never summarized, paraphrased, or rewritten."
+
+dense_index_metadata:
+  description: "Persisted metadata sidecar for a DenseIndex (everything except the FAISS binary vector data itself)."
+  fields:
+    - name: "embedding_config"
+      type: "object"
+      required: true
+      description: "retrieval.embeddings.EmbeddingConfig fields (model_name, device, normalize, batch_size, contract_version)."
+    - name: "dense_index_config"
+      type: "object"
+      required: true
+      description: "retrieval.models.DenseIndexConfig fields (index_type, contract_version)."
+    - name: "model_identity"
+      type: "string"
+      required: true
+    - name: "dimension"
+      type: "integer"
+      required: true
+    - name: "chunk_count"
+      type: "integer"
+      required: true
+    - name: "chunk_ids"
+      type: "list[string]"
+      required: true
+      description: "Internal FAISS vector position -> Phase 4 chunk_id, in build order."
+    - name: "chunk_provenance"
+      type: "list[object]"
+      required: true
+      description: "Parallel to chunk_ids: document_id/source_family_id/jurisdiction/content_hash/synthetic/page_numbers/block_ids/text per chunk."
+    - name: "signature"
+      type: "string"
+      required: true
+      description: "Deterministic index identity - see retrieval.identity.compute_dense_index_signature."
+
+safety_invariants:
+  - id: "DENSE-SCHEMA-SAFE-01"
+    rule: "block_ids is never an empty list; every dense retrieval result traces back to at least one Phase 3 block."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "DENSE-SCHEMA-SAFE-02"
+    rule: "chunk_id is always the real Phase 4 chunk_id - never a FAISS internal integer position, array index, or generated display name."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "DENSE-SCHEMA-SAFE-03"
+    rule: "model_identity is recorded on both the index metadata and every retrieval result - a result can never be mistaken as coming from a different embedding model than the one that actually produced it."
+    source_label: "[ENGINEERING RECOMMENDATION]"

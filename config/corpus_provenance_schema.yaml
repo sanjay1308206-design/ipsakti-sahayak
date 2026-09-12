@@ -1,0 +1,170 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 2 machine-readable minimum provenance contract for any future
+# corpus document.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_02_CORPUS_ADMISSION_POLICY.md
+#
+# This is a SCHEMA (shape), not real data. No document described by this
+# schema has been created; Phase 3+ ingestion must produce records
+# conforming to it.
+#
+# CHANGELOG (Phase 3, schema_version 1.0.0 -> 1.1.0): clarified the
+# `synthetic` field description and PROV-SAFE-01 below. The original
+# wording ("must be rejected by real ingestion code") was written before
+# Phase 3 existed and, taken literally, would make it impossible for
+# Phase 3's own ingestion pipeline to be tested at all - every Phase 3
+# test fixture is required (by this same schema, and by the project's
+# synthetic-fixture policy) to set synthetic=true, since no real
+# Phase-2-admitted document exists anywhere in this repository. This is a
+# disclosed refinement, not a silent weakening: the safety intent is
+# preserved (a synthetic record must never be mistaken for, or persisted
+# as, real corpus evidence) while removing the accidental self-contradiction.
+# See docs/PHASE_03_DOCUMENT_INGESTION.md Section C for the full rationale.
+
+schema_version: "1.1.0"
+
+description: >
+  Minimum provenance record every future corpus document must carry.
+  Unknown values must be represented explicitly (e.g. a paired *_known
+  boolean, or an explicit "UNKNOWN" enum value) - never omitted and never
+  defaulted to a value implying certainty.
+
+fields:
+  - name: "document_id"
+    type: "string"
+    required: true
+    description: "Stable logical identity of the document across versions. Assigned at ingestion time (Phase 3+); never invented here."
+
+  - name: "source_family_id"
+    type: "enum"
+    enum_ref: "authority_matrix.source_families[*].source_family_id"
+    required: true
+    description: "Must reference a source family registered in config/authority_matrix.yaml."
+
+  - name: "source_reference"
+    type: "string"
+    required: true
+    description: "The specific document's URL or official reference, distinct from the source family's portal URL."
+
+  - name: "jurisdiction"
+    type: "enum"
+    enum_ref: "authority_matrix.valid_jurisdictions"
+    required: true
+    description: "Must equal the source family's fixed jurisdiction_scope; a mismatch is a REJECT-level integrity error, not a per-document choice."
+
+  - name: "title"
+    type: "string"
+    required: true
+
+  - name: "document_type"
+    type: "string"
+    required: true
+    description: "Must be one of the source family's allowed_document_types in config/authority_matrix.yaml."
+
+  - name: "publication_date"
+    type: "string"
+    required: false
+    description: "ISO-8601 date, if known."
+
+  - name: "effective_date"
+    type: "string"
+    required: false
+    description: "ISO-8601 date, if known."
+
+  - name: "effective_date_known"
+    type: "boolean"
+    required: true
+    description: "Explicit flag - must be false (not omitted) when effective_date is not established."
+
+  - name: "version"
+    type: "string"
+    required: false
+
+  - name: "version_known"
+    type: "boolean"
+    required: true
+    description: "Explicit flag - must be false (not omitted) when version is not established. version_known=false and effective_date_known=false together cap admission at ADMIT_WITH_RESTRICTION (see docs/PHASE_02_CORPUS_ADMISSION_POLICY.md rule A10)."
+
+  - name: "retrieved_at"
+    type: "string"
+    required: true
+    description: "ISO-8601 timestamp of acquisition. Not populated by Phase 2 (no acquisition occurs)."
+
+  - name: "content_hash"
+    type: "string"
+    required: true
+    description: "SHA-256 (or equivalent) hash of the normalized source content, used for integrity checking and duplicate detection."
+
+  - name: "provenance_status"
+    type: "enum"
+    allowed_values: ["COMPLETE", "PARTIAL", "UNKNOWN"]
+    required: true
+
+  - name: "validation_status"
+    type: "enum"
+    allowed_values: ["UNVALIDATED", "VALIDATED", "VALIDATION_FAILED"]
+    required: true
+    description: "Only VALIDATED may reach ADMIT (docs/PHASE_02_CORPUS_ADMISSION_POLICY.md rule A6)."
+
+  - name: "supersession_status"
+    type: "enum"
+    allowed_values: ["CURRENT", "SUPERSEDED", "SUPERSEDES_ANOTHER", "UNKNOWN"]
+    required: true
+    description: "SUPERSEDED is terminal (rule A7); UNKNOWN caps admission at ADMIT_WITH_RESTRICTION (rule A11)."
+
+  - name: "conflict_status"
+    type: "enum"
+    allowed_values: ["NONE", "CONFLICTING", "RESOLVED"]
+    required: false
+    description: "Required (non-null) whenever known_conflicting_with is non-empty (rule A9); see docs/PHASE_02_SOURCE_CONFLICT_POLICY.md."
+
+  - name: "known_conflicting_with"
+    type: "list[string]"
+    required: false
+    description: "document_id values of other documents this one is known to conflict with, if any."
+
+  - name: "admission_status"
+    type: "enum"
+    allowed_values: ["ADMIT", "ADMIT_WITH_RESTRICTION", "HOLD_FOR_VALIDATION", "REJECT", "SUPERSEDED"]
+    required: false
+    description: "Populated by the (future) admission process; not set by Phase 2 itself for any real document."
+
+  - name: "restriction_reason"
+    type: "list[string]"
+    required: false
+    description: "Reason codes explaining an ADMIT_WITH_RESTRICTION/HOLD_FOR_VALIDATION/REJECT outcome."
+
+  - name: "notes"
+    type: "string"
+    required: false
+
+  - name: "synthetic"
+    type: "boolean"
+    required: true
+    default: false
+    description: >
+      Must be true ONLY for test fixtures used by this project's own test
+      suite. Real corpus records (any future ingestion of an actually
+      Phase-2-admitted document) must never set this true. Ingestion code
+      (Phase 3+) MAY process a synthetic=true record - this is how the
+      pipeline itself is tested - but MUST propagate the flag verbatim
+      into its output and MUST NOT persist, or represent, a synthetic
+      record as real corpus evidence (see PROV-SAFE-01, PROV-SAFE-05).
+
+safety_invariants:
+  - id: "PROV-SAFE-01"
+    rule: "A record with synthetic == true must never be represented, persisted, or treated as real corpus evidence by any future ingestion or retrieval code. Ingestion code may process such a record (for its own testing) but must propagate synthetic=true unchanged into every output it produces."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "PROV-SAFE-02"
+    rule: "version_known == false implies the record can never reach plain ADMIT; at best ADMIT_WITH_RESTRICTION."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "PROV-SAFE-03"
+    rule: "jurisdiction must match the referenced source family's fixed jurisdiction_scope in config/authority_matrix.yaml."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "PROV-SAFE-04"
+    rule: "validation_status must equal VALIDATED for a record to reach ADMIT."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "PROV-SAFE-05"
+    rule: "Ingestion pipeline output must expose a synthetic flag that downstream persistence logic (a later phase, not Phase 3) MUST check before writing to any real/persistent corpus store; no such store exists yet in this repository."
+    source_label: "[ENGINEERING RECOMMENDATION]"

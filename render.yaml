@@ -1,0 +1,71 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 20 (Deployment Engineering) — Render Free Blueprint.
+#
+# [OFFICIAL SOURCE] Field names/structure verified against current
+# official Render documentation at implementation time:
+#   - https://render.com/docs/blueprint-spec (Blueprint YAML fields)
+#   - https://render.com/docs/web-services (Python web service, PORT/host binding)
+#   - https://render.com/docs/static-sites (static site build/publish)
+#   - https://render.com/docs/health-checks (healthCheckPath contract)
+#   - https://render.com/docs/python-version / https://render.com/docs/node-version
+#
+# [ENGINEERING RECOMMENDATION] This Blueprint is optional (Render also
+# supports dashboard/CLI/API-only deployment) but is included because it
+# gives a reproducible, version-controlled description of both services,
+# per Phase 20 instructions.
+#
+# COST LOCK: both services use plan: free. No database, no Docker, no
+# GPU, no paid add-on, no custom domain is declared anywhere in this
+# file. If Render ever requires a paid plan for either service, this
+# file must NOT be silently changed to a paid plan - report it instead
+# (docs/PHASE_20_DEPLOYMENT_ENGINEERING.md "COST ANALYSIS").
+#
+# ORDERING NOTE: envVars marked `sync: false` are NOT set here and must
+# be filled in manually (Render dashboard, or the Blueprint-creation
+# prompt) AFTER both services exist and their real *.onrender.com URLs
+# are known - Vite bakes VITE_API_BASE_URL into the static build at
+# BUILD TIME (https://vite.dev/guide/env-and-mode: VITE_-prefixed
+# variables are statically replaced at build time, never read at
+# runtime), so the frontend's first real build must happen (or be
+# re-triggered) only after the backend service's URL is known.
+
+services:
+  - name: ipsakti-backend
+    type: web
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements-render.txt
+    # api.app:app matches src/api/app.py's module-level `app = create_app()`
+    # (docs/PHASE_17_BACKEND_PRODUCTIZATION.md Section D/E). --app-dir src
+    # makes src/ the import root, exactly like tests/conftest.py's own
+    # sys.path.insert(0, ".../src") - no change to any src/ file.
+    # --host 0.0.0.0 --port $PORT is Render's own documented requirement
+    # (https://render.com/docs/web-services, "PORT" section).
+    startCommand: uvicorn api.app:app --host 0.0.0.0 --port $PORT --app-dir src
+    healthCheckPath: /health
+    envVars:
+      # CORS is closed by default (src/api/app.py only adds CORSMiddleware
+      # when this is set - docs/PHASE_17_BACKEND_PRODUCTIZATION.md Section
+      # AA). Never set to "*" here - the actual frontend origin is filled
+      # in manually once its Render URL is known.
+      - key: IPSAKTI_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.10.11"
+
+  - name: ipsakti-frontend
+    type: web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      # frontend/src/api/client.ts already reads this (Phase 18); baked in
+      # at build time by Vite, defaulting to "" (same-origin) if unset -
+      # never a hardcoded backend URL in source. Filled in manually once
+      # the backend service's real URL is known (see ORDERING NOTE above).
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: NODE_VERSION
+        value: "24.14.0"

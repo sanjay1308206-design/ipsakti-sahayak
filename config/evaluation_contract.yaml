@@ -1,0 +1,97 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 16 machine-readable evaluation/red-team contract.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_16_EVALUATION_AND_RED_TEAM.md
+# Implementation: src/evaluation/models.py, metrics.py, benchmark.py, redteam.py, runner.py
+#
+# CRITICAL: this contract measures the system as it actually is. It does
+# NOT change retrieval/classification/jurisdiction/citation/grounding/
+# safety/multilingual/human-review behavior, and it does NOT fabricate a
+# benchmark result. See config/redteam_cases.yaml for the red-team
+# case catalogue.
+
+contract_version: "1.0.0"
+
+evaluation_schema_version: "1.0.0"
+
+# [ENGINEERING RECOMMENDATION] versioned independently of
+# evaluation_schema_version - the benchmark CASE CATALOGUE can evolve
+# separately from the result-object shapes. Never a timestamp.
+benchmark_schema_version: "1.0.0"
+
+reused_contracts:
+  - "retrieval.evaluation (Phase 5/6) - precision_at_k/recall_at_k/mean_reciprocal_rank, reused verbatim, never reimplemented."
+  - "citation.metrics.compute_citation_coverage (Phase 9) - CitationCoverageMetrics, reused verbatim, never re-derived."
+  - "classification.classifier.classify (Phase 11) - called by test-layer benchmarks, never reimplemented here."
+  - "jurisdiction.firewall.resolve_jurisdiction / jurisdiction.filtering.filter_evidence (Phase 12) - called by test-layer benchmarks, never reimplemented here."
+  - "safety.evaluator.evaluate_safety (Phase 13) - called by test-layer benchmarks; thresholds are Phase 13's own [ASSUMPTION], never modified here."
+  - "multilingual.delivery.deliver_response / multilingual.preservation (Phase 14) - called by test-layer benchmarks, never reimplemented here."
+  - "review.policy / review.workflow (Phase 15) - called by test-layer benchmarks, never reimplemented here."
+
+# Components already covered exhaustively by an earlier phase's own test
+# suite - Phase 16 references this coverage rather than duplicating it.
+referenced_existing_coverage_components: ["CORPUS_PROVENANCE", "DOCUMENT_STRUCTURE", "EVIDENCE_CONSTRUCTION"]
+referenced_existing_coverage_sources:
+  CORPUS_PROVENANCE: "Phase 2/3 (tests/test_phase_02_*.py, tests/test_phase_03_provenance.py)"
+  DOCUMENT_STRUCTURE: "Phase 3/4 (tests/test_phase_03_structure.py, tests/test_phase_04_*.py)"
+  EVIDENCE_CONSTRUCTION: "Phase 8 (tests/test_phase_08_*.py, 191 tests)"
+
+component_vocabulary:
+  [
+    "CORPUS_PROVENANCE", "DOCUMENT_STRUCTURE", "EVIDENCE_CONSTRUCTION",
+    "BM25_RETRIEVAL", "DENSE_RETRIEVAL", "HYBRID_RRF_RETRIEVAL", "RERANKED_RETRIEVAL",
+    "CITATION_INTEGRITY", "GROUNDED_GENERATION", "CLASSIFICATION", "JURISDICTION",
+    "SAFETY_ABSTENTION", "MULTILINGUAL_DELIVERY", "HUMAN_REVIEW", "END_TO_END", "RED_TEAM_SECURITY",
+  ]
+
+# COMPONENT metrics vs END-TO-END metrics are always reported separately -
+# END_TO_END and RED_TEAM_SECURITY are their own component entries, never
+# folded into a per-stage number.
+end_to_end_component: "END_TO_END"
+red_team_component: "RED_TEAM_SECURITY"
+
+# docs Section F - every benchmark expectation identifies its own origin.
+ground_truth_origin_vocabulary: ["SYNTHETIC_EXPECTATION", "AUTHORITATIVE_EXPECTATION", "STRUCTURAL_EXPECTATION", "SECURITY_EXPECTATION"]
+
+# docs "ZERO-DENOMINATOR POLICY" - the ONLY representation of an
+# undefined metric anywhere in this contract.
+zero_denominator_policy: "APPLICABLE_FALSE_VALUE_NULL_NEVER_ZERO_NEVER_NAN_NEVER_INFINITY"
+
+failure_category_vocabulary:
+  [
+    "INCORRECT_CLASSIFICATION", "INCORRECT_JURISDICTION", "UNEXPECTED_SAFETY_STATUS",
+    "UNEXPECTED_GROUNDING_STATUS", "UNEXPECTED_REVIEW_TRIGGER", "RETRIEVAL_MISS",
+    "CITATION_MISMATCH", "MULTILINGUAL_PRESERVATION_FAILURE", "SECURITY_ATTACK_SUCCEEDED", "OTHER",
+  ]
+
+# Categorical severity only - never a CVSS score (docs "Do NOT invent CVSS scores").
+severity_vocabulary: ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+
+out_of_scope:
+  - "Changing retrieval/classification/jurisdiction/citation/grounding/safety/multilingual/human-review logic to make a benchmark pass."
+  - "A large, authoritative, human-validated real-regulatory benchmark - deferred (docs Section AC)."
+  - "Semantic claim/evidence entailment - remains Phase 9's own [DEFERRED] boundary, never implemented here."
+  - "Statistical significance testing or confidence intervals on tiny synthetic datasets."
+  - "FastAPI productization, a frontend, deployment, observability, backup, corpus refresh, or CI/CD (Phases 17-22)."
+  - "Production validation (Phase 23)."
+
+safety_invariants:
+  - id: "EVAL-SAFE-01"
+    rule: "src/evaluation/ never imports a mutator/constructor that could alter retrieval/classification/jurisdiction/citation/grounding/safety/multilingual/review behavior - it only calls read-only comparison/scoring logic over already-computed real objects."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "EVAL-SAFE-02"
+    rule: "EvaluationResult.value is None if and only if applicable is False - a real computed 0.0 is always structurally distinguishable from an undefined/NOT_APPLICABLE metric."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVAL-SAFE-03"
+    rule: "A failed benchmark case is never hidden, silently retried, or auto-fixed inside the evaluator - it is reported in failed_case_ids and, where triaged, a FailureTriageEntry."
+    source_label: "[OFFICIAL SOURCE]"
+  - id: "EVAL-SAFE-04"
+    rule: "report_id is a deterministic SHA-256 hash of the report's own canonical fields - never a random UUID, never derived from a timestamp."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVAL-SAFE-05"
+    rule: "No red-team case catalogue entry is generated randomly - REDTEAM_CASES is a fixed, deterministic tuple."
+    source_label: "[ENGINEERING RECOMMENDATION]"
+  - id: "EVAL-SAFE-06"
+    rule: "attack_success_rate/detection_rate are None when attack_cases == 0 - never a fabricated 0.0 for an empty red-team run."
+    source_label: "[ENGINEERING RECOMMENDATION]"
