@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from _repo_scan import is_repo_scan_excluded
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
 CONFIG_DIR = REPO_ROOT / "config"
@@ -156,7 +158,7 @@ def test_no_phase_17_or_later_directories_exist_yet():
 
 
 def test_no_future_phase_module_names_present_anywhere():
-    candidate_files = [f for f in REPO_ROOT.rglob("*.py") if ".git" not in f.parts]
+    candidate_files = [f for f in REPO_ROOT.rglob("*.py") if not is_repo_scan_excluded(f)]
     lowered_names = [f.name.lower() for f in candidate_files]
     for hint in FUTURE_IMPLEMENTATION_MODULE_HINTS:
         matches = [n for n in lowered_names if hint in n]
@@ -221,7 +223,7 @@ def test_no_new_dependency_declared_beyond_phase_6_baseline():
 
 def test_no_corpus_document_files_exist_anywhere():
     doc_like_extensions = (".pdf", ".html", ".htm", ".docx", ".doc")
-    found = [p for p in REPO_ROOT.rglob("*") if p.is_file() and p.suffix.lower() in doc_like_extensions and ".git" not in p.parts and "frontend" not in p.parts]
+    found = [p for p in REPO_ROOT.rglob("*") if p.is_file() and p.suffix.lower() in doc_like_extensions and not is_repo_scan_excluded(p) and "frontend" not in p.parts]
     assert found == [MASTER_REFERENCE_PDF], f"unexpected document-like file(s) found (possible ingestion/corpus leakage): {found}"
 
 
