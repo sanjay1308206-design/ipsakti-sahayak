@@ -3,20 +3,60 @@
 #
 # This file is DELIBERATELY SEPARATE from requirements-dev.txt (which is
 # never modified by this phase - docs/PHASE_20_DEPLOYMENT_ENGINEERING.md).
-# requirements-dev.txt bundles the full Phase 0-19 project-control/testing
-# footprint (pytest, PyYAML, pypdf, sentence-transformers, faiss-cpu,
-# numpy) alongside the three packages the deployed FastAPI app actually
-# imports. None of the Phase 6 dense-retrieval packages (sentence-
-# transformers/faiss-cpu/numpy/torch, transitively) or ingestion package
-# (pypdf) is imported anywhere by src/api/ or src/application/, or by any
-# Phase 8-15 module they call (each of those phases is stdlib-only per
-# its own dependency policy - see requirements-dev.txt's per-phase
-# comments) - installing them on a Render Free web service (0.1 CPU /
-# 512 MB RAM, [OFFICIAL SOURCE] https://render.com/docs/compute-plans)
-# would be slow, disk-heavy, and entirely unused at runtime.
 #
-# Exact same verified-working version ranges as requirements-dev.txt
-# (Phase 17's own AE section) - never a different, unverified pin.
+# CORRECTED (Phase 20.4-B Fix 1) after an actual Render deployment failure
+# (`ModuleNotFoundError: No module named 'numpy'` during application
+# startup): the original comment here claimed no Phase 6 dense-retrieval
+# package was imported anywhere on the deployed path - that claim was
+# WRONG, and is corrected rather than repeated. The real import chain,
+# confirmed by direct inspection, is:
+#   api.app -> api.routes -> application.service
+#   -> `from evidence.builder import build_evidence_pack` (module-level,
+#      runs at STARTUP, not per-request)
+#   -> evidence/builder.py: `from retrieval.models import ...`
+#   -> Python always executes a package's __init__.py before any of its
+#      submodules, so importing ANY name from `retrieval.models` first
+#      runs the whole retrieval/__init__.py, which unconditionally does
+#      `from .embeddings import ...` (hard `import numpy as np` at module
+#      level, retrieval/embeddings.py) and `from .faiss_index import ...`
+#      (hard `import faiss` at module level, retrieval/faiss_index.py) -
+#      regardless of the fact that evidence/builder.py itself only ever
+#      uses `retrieval.models` (stdlib-only) and never calls anything
+#      embedding/FAISS-related.
+# `sentence_transformers`/`torch` remain correctly EXCLUDED: both
+# `SentenceTransformerEmbeddingModel` (retrieval/embeddings.py) and
+# `CrossEncoderReranker` (retrieval/reranker.py) import
+# `sentence_transformers` lazily, INSIDE their own load methods, never at
+# module top level - and nothing on the deployed app's default path
+# (`default_evidence_pack_builder` calls `build_evidence_pack([], query)`
+# with an empty candidate list) ever instantiates or calls either class.
+#
+# CORRECTED AGAIN (Phase 20.4-B Fix 2) after a second actual Render
+# deployment failure (`ModuleNotFoundError: No module named 'yaml'`),
+# found one further link down the SAME kind of chain: `retrieval/
+# faiss_index.py` (imported by retrieval/__init__.py, see above) itself
+# does `from chunking.models import Chunk`, which executes the whole
+# `chunking/__init__.py`, which does `from .chunker import
+# chunk_document`, which does `from ingestion.models import ...`, which
+# executes the whole `ingestion/__init__.py`, which does `from .pipeline
+# import ingest_document, ingest_bytes`, which does `from .admission
+# import ...`, and `ingestion/admission.py` does a hard, module-level
+# `import yaml` (to load `config/authority_matrix.yaml`'s admission
+# boundary check) - so PyYAML is ALSO required at startup, for the same
+# reason numpy/faiss-cpu are: importing one name from a package always
+# runs that package's (and every package it in turn imports from) whole
+# `__init__.py` first.
+#
+# No source file was changed to make either fix - the dependency
+# manifest alone was corrected, twice, to match the actual (not assumed)
+# import graph, each time only after a real, observed startup failure.
+#
+# Same verified-working version ranges as requirements-dev.txt (Phase
+# 17's own AE section / Phase 6's own dependency declarations) - never a
+# different, unverified pin.
 fastapi>=0.136,<0.137
 pydantic>=2,<3
 uvicorn>=0.42,<0.43
+numpy>=2,<3
+faiss-cpu>=1,<2
+PyYAML>=6,<7

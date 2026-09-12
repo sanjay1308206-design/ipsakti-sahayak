@@ -21,8 +21,24 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 EXPECTED_DEV_DEPENDENCIES = {
     "pytest", "pyyaml", "pypdf", "sentence-transformers", "faiss-cpu", "numpy", "fastapi", "pydantic", "uvicorn", "httpx",
 }
-EXPECTED_RENDER_DEPENDENCIES = {"fastapi", "pydantic", "uvicorn"}
-FORBIDDEN_RENDER_DEPENDENCIES = {"pytest", "pyyaml", "pypdf", "sentence-transformers", "faiss-cpu", "numpy", "httpx", "torch", "transformers"}
+# [OUR ENHANCEMENT] Phase 20.4-B Fix 1 + Fix 2: numpy/faiss-cpu/PyYAML
+# were added, one real Render deployment failure at a time
+# (ModuleNotFoundError: numpy, then faiss's own import of chunking.models
+# triggering ingestion's own `import yaml`), each proving the package IS
+# required at application STARTUP - see requirements-render.txt's own
+# header comment for the full, corrected import-chain explanation of
+# both. `pypdf` was checked the same way (a clean venv with only this
+# file's packages was proven to start successfully WITHOUT pypdf
+# installed) and correctly stays forbidden: `ingestion/extractors.py`
+# imports it lazily, inside a function, never at module top level, and
+# nothing on the deployed app's startup or default request path calls
+# that function. `sentence-transformers`/`torch`/`transformers` remain
+# forbidden for the same reason (lazy, inside `SentenceTransformerEmbeddingModel`/
+# `CrossEncoderReranker`'s own load methods, never called by the default
+# path). `pytest`/`httpx` remain forbidden - test-only, never imported by
+# `src/api/`/`src/application/` or anything they call.
+EXPECTED_RENDER_DEPENDENCIES = {"fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml"}
+FORBIDDEN_RENDER_DEPENDENCIES = {"pytest", "pypdf", "sentence-transformers", "httpx", "torch", "transformers"}
 
 SECRET_ASSIGNMENT_PATTERN = re.compile(
     r'(api[_-]?key|password|access[_-]?token|auth[_-]?token|secret[_-]?key)\s*[=:]\s*["\']?[^"\'\s]{4,}', re.IGNORECASE
@@ -65,7 +81,7 @@ def test_requirements_render_pins_match_requirements_dev_pins():
                 return stripped
         raise AssertionError(f"{package} not found")
 
-    for package in ("fastapi", "pydantic", "uvicorn"):
+    for package in ("fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml"):
         assert _pin(render_text, package) == _pin(dev_text, package)
 
 
