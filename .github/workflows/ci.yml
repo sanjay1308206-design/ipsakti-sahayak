@@ -265,6 +265,17 @@ jobs:
         with:
           python-version-file: ".python-version"
           cache: "pip"
+          # [ENGINEERING RECOMMENDATION] Without this, actions/setup-python's
+          # pip cache defaults to hashing **/requirements.txt or
+          # **/pyproject.toml for its cache key - this repository has
+          # neither (it deliberately uses requirements-dev.txt/
+          # requirements-render.txt, per-phase, Phase 0 Rule 6), which made
+          # the action fail before any install/test step ran. Pointing it
+          # explicitly at the real lockfile this job actually installs from
+          # mirrors the Node job's own cache-dependency-path convention
+          # below (frontend/package-lock.json) - never a fake
+          # requirements.txt/pyproject.toml added merely to satisfy caching.
+          cache-dependency-path: "requirements-dev.txt"
 
       - name: Install backend dependencies (requirements-dev.txt)
         run: pip install -r requirements-dev.txt
@@ -313,6 +324,9 @@ jobs:
         with:
           python-version-file: ".python-version"
           cache: "pip"
+          # See the `backend` job's identical comment above - same fix,
+          # same reason (no requirements.txt/pyproject.toml exists here).
+          cache-dependency-path: "requirements-dev.txt"
 
       - name: Install backend dependencies (requirements-dev.txt)
         run: pip install -r requirements-dev.txt
