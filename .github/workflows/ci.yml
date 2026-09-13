@@ -1,0 +1,489 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 22 Step 22.2 — CI pipeline foundation.
+#
+# [ENGINEERING RECOMMENDATION] GitHub Actions was chosen because this
+# repository already uses GitHub as its host and no other CI provider
+# exists anywhere in the repository (docs/PHASE_22_CICD_PRODUCTION_RELEASE.md,
+# Step 22.2 instruction) - this is an engineering choice, not an
+# [OFFICIAL PS]/[OFFICIAL SOURCE] requirement (CAP-22 names no CI vendor).
+#
+# SCOPE (docs/PHASE_22_CICD_PRODUCTION_RELEASE.md Step 22.1 resolution):
+# this workflow is the CI FOUNDATION ONLY - it runs the project's existing
+# backend (pytest) and frontend (vitest/oxlint/vite build) verification
+# commands in a reproducible environment. It does NOT version a release,
+# build a container image (Step 22.1 explicitly excludes Docker), deploy
+# to Render, or perform any rollback - those remain later, separate Phase
+# 22 steps.
+#
+# DETERMINISM: the Python/Node runtime versions are read directly from
+# this repository's own existing pin files (.python-version,
+# frontend/.node-version - both already consumed by render.yaml's
+# PYTHON_VERSION/NODE_VERSION env vars, Phase 20) via
+# actions/setup-python's `python-version-file` and actions/setup-node's
+# `node-version-file` inputs - never a second, hardcoded, driftable copy
+# of the version string. Dependency installation is deterministic:
+# `pip install -r requirements-dev.txt` (exact pins, unchanged by this
+# step) and `npm ci` (respects frontend/package-lock.json exactly, never
+# `npm install`).
+#
+# Phase 22 Step 22.3 — Automated quality + evaluation gate.
+#
+# [ENGINEERING RECOMMENDATION] CAP-22's own lifecycle names "automated
+# tests" and "evaluation gates" as two DISTINCT stages
+# (docs/PHASE_22_CICD_PRODUCTION_RELEASE.md Section 4). The `evaluation`
+# job below makes that distinction visible and auditable as its own named
+# CI check, rather than folding it invisibly into the `backend` job's
+# full regression run. It reuses, never reimplements, two existing,
+# already-deterministic evaluation mechanisms:
+#   1. Phase 16 "Evaluation & Red-Team Benchmark" (`tests/test_phase_16_*.py`,
+#      docs/PHASE_16_EVALUATION_AND_RED_TEAM.md) - this project's own
+#      general evaluation/benchmark/red-team harness.
+#   2. Phase 21's corpus-refresh EVALUATE stage
+#      (`tests/test_phase_21_corpus_refresh.py`,
+#      `tests/test_phase_21_acceptance.py`,
+#      docs/PHASE_21_OBSERVABILITY_BACKUP_CORPUS_REFRESH.md Sections
+#      17.3/19) - the specific release-safety evaluation gate CAP-21 and
+#      CAP-22 both reference.
+# Both are already exercised by `backend`'s own full-suite run; running
+# this narrower, separately-labeled subset again here is a deliberate,
+# disclosed, small redundancy in CI minutes traded for an explicit,
+# individually-reportable "evaluation" check - not a new capability and
+# not a second competing evaluation framework. Fully deterministic, no
+# network call, no external dataset, no secret (verified by
+# tests/test_phase_22_evaluation_gate.py).
+#
+# Phase 22 Step 22.4 — Release identity + reproducible release-artifact
+# manifest.
+#
+# [ENGINEERING RECOMMENDATION] The `release-artifact` job below only
+# GENERATES and uploads (as a GitHub-native CI artifact, never an
+# external/paid service) a deterministic release manifest via
+# scripts/build_release_manifest.py - see that script's own module
+# docstring for the full rationale (release identity = git commit SHA,
+# never the unrelated API_VERSION; artifact = a content-hashed manifest,
+# never a Docker image or re-bundled source tarball, consistent with
+# Step 22.1's Docker exclusion and Render's own git-native deploy model).
+# `needs: [backend, frontend, evaluation]` so a release manifest is only
+# ever produced for a revision that already passed every existing
+# quality/evaluation gate. This job deploys nothing, publishes nothing,
+# uses no credential/secret, and configures no staging/production/
+# rollback target - those remain later, separate Phase 22 steps.
+#
+# Phase 22 Step 22.5 - staging release + smoke tests.
+#
+# [ENGINEERING RECOMMENDATION] STAGING DEFINITION (docs/
+# PHASE_22_CICD_PRODUCTION_RELEASE.md Section 7, [DEFERRED]-resolved
+# here, full rationale in scripts/staging_smoke_test.py's own module
+# docstring): "staging" for this project, today, is an EPHEMERAL
+# instance of the candidate release's backend and frontend, run on this
+# disposable GitHub Actions runner and torn down when the job ends -
+# NEVER a second live Render service. A second Render service was
+# deliberately NOT created by this step: Render's current free-tier
+# service-count limit for this account cannot be verified from within
+# this repository ([ASSUMPTION], unresolved - docs/
+# PHASE_20_DEPLOYMENT_ENGINEERING.md Section 11's own disclosed
+# boundary), so provisioning one is [DEFERRED] rather than assumed safe,
+# consistent with this step's own explicit instruction not to assume
+# Render Free limits or auto-create a paid/second service. Provisioning
+# a real Render staging service remains a future, explicit, disclosed
+# decision requiring (a) manual creation of that service via the Render
+# dashboard (never automated here) and (b) its deploy-hook URL and
+# public health-check URL added as repository secrets/variables - until
+# then, this job's local mechanism IS this project's staging release.
+#
+# This mechanism structurally satisfies every stated safety requirement:
+# it can never accidentally replace production (it never calls Render's
+# API or dashboard anywhere), needs no production credential (uses none
+# at all), and is trivially distinguishable from production (it runs on
+# 127.0.0.1, torn down at job end, never an *.onrender.com URL).
+#
+# RELEASE IDENTITY: this job checks out and runs the SAME commit
+# `backend`/`evaluation`/`release-artifact` already validated in this
+# same CI run (`needs`, below) - the process under smoke test IS that
+# exact release_id (Step 22.4's git-commit-SHA identity) by construction,
+# reconfirmed with `git rev-parse HEAD` for an explicit log record, never
+# a second, invented versioning scheme (no timestamp/UUID/run-id used as
+# an identity anywhere in this job).
+#
+# RELEASE ARTIFACT: Render's own deploy model clones the repository and
+# builds it directly (Step 22.1) - it never consumes
+# `release_manifest.json`. This job instead runs the exact commands
+# `render.yaml` itself specifies (`pip install -r
+# requirements-render.txt`, the same `uvicorn ... --app-dir src` start
+# command, and `npm ci && npm run build`), so passing this job is
+# evidence the commit Render would build and start actually boots and
+# answers its documented health contract - the closest verification
+# possible without a live Render deployment.
+#
+# SAFETY: no GitHub Actions secret is declared or referenced anywhere in
+# this job - there is nothing to leak into logs. No Docker, no
+# `render.com`/`onrender.com` call, no production/rollback/promotion
+# action of any kind.
+#
+# Phase 22 Step 22.6 - production deployment (to the EXISTING Phase 20
+# Render services - never a new/renamed service, never Docker, never a
+# database, never another cloud provider).
+#
+# PRODUCTION TARGET: the two services `render.yaml` already declares
+# (`ipsakti-backend`, `ipsakti-frontend`) - unchanged by this step. No
+# service ID, API key, deploy-hook URL, or production URL is guessed,
+# invented, or hardcoded anywhere below - each is referenced ONLY via a
+# GitHub Secret/Variable that a human must configure manually (see the
+# `production` job's own steps for the exact names) - this project has
+# never stored one anywhere (docs/PHASE_20_DEPLOYMENT_ENGINEERING.md
+# Section 8/15, unchanged, reaffirmed here).
+#
+# MECHANISM CHOICE ([EXTERNAL RESEARCH], render.com/docs/deploy-hooks and
+# render.com/docs/blueprint-spec, verified against Render's own current
+# documentation at implementation time): Render's native git-based
+# auto-deploy defaults to redeploying on EVERY push to the connected
+# branch (`autoDeployTrigger: commit`, the default when unset) - that
+# would violate this step's own "must not run merely because code was
+# pushed" requirement, since `render.yaml` does not currently set
+# `autoDeployTrigger`. Render also supports `autoDeployTrigger:
+# checksPass` (deploy only once the commit's CI checks succeed) as a
+# render.yaml-only alternative - NOT applied here without your explicit
+# approval, since `render.yaml` is a Phase-20-locked file this step may
+# only change for "a genuine production-blocking defect", and changing
+# an existing service's deploy-trigger semantics is a real behavior
+# change, not a defect fix - see this step's own final report for the
+# full disclosure. Given that, the mechanism actually implemented here is
+# Render's own DEPLOY HOOK (a secret, per-service URL from the Render
+# dashboard's Settings tab; POSTing to it triggers an on-demand deploy
+# independent of git push events, and accepts a `ref=<commit-sha>` query
+# parameter to pin the EXACT commit being deployed - never "whatever HEAD
+# of main happens to be" by the time the hook fires) - the minimum
+# mechanism that is both controllable (gated on this job's own `needs`)
+# and verifiable (its HTTP response is checked), without inventing a
+# Render API client/SDK.
+#
+# GATING: `needs: [backend, frontend, evaluation, release-artifact,
+# staging]` - production can NEVER run unless every earlier gate,
+# including the staging smoke test, has already passed for this exact
+# commit.
+#
+# CREDENTIALS: two OPTIONAL GitHub Secrets this job references but NEVER
+# creates, hardcodes, or prints - `RENDER_BACKEND_DEPLOY_HOOK_URL` and
+# `RENDER_FRONTEND_DEPLOY_HOOK_URL` (the full deploy-hook URL, including
+# its `?key=...` query string, copied from each Render service's own
+# Settings tab). If either is absent, that service's deployment step
+# fails closed (skips the actual deploy call and reports the missing
+# prerequisite) rather than guessing, inventing, or silently no-op'ing
+# as if it succeeded. Two OPTIONAL GitHub Variables (never secret, since
+# a service URL is not sensitive) - `RENDER_BACKEND_PRODUCTION_URL` and
+# `RENDER_FRONTEND_PRODUCTION_URL` - are used ONLY to smoke-test a
+# deployment this job actually triggered; smoke-testing is skipped, not
+# faked, when a variable is absent.
+#
+# APPROVAL BOUNDARY ([ENGINEERING RECOMMENDATION]/[DEFERRED]): no
+# authoritative source (config/acceptance_contract.yaml's CAP-22,
+# docs/MASTER_REFERENCE_LOCK.md, docs/DEVELOPMENT_RULES.md) mandates a
+# separate human-click approval step beyond the gates already listed
+# above, so none is invented here. The credential itself already IS a
+# human approval boundary in practice: production can only ever deploy
+# once a person has deliberately copied a real deploy-hook URL into
+# GitHub Secrets - there is no path to a live deployment without that
+# manual act. If stronger, PER-DEPLOYMENT manual click-through approval
+# is wanted later, GitHub's own `environment:` protection rules
+# (configured on GitHub's side under Settings -> Environments, never
+# fabricated in this YAML alone) are the standard mechanism - deliberately
+# left as an explicit, separate, future decision rather than assumed
+# here.
+#
+# SAFETY: never targets staging (no 127.0.0.1 URL anywhere in this job);
+# no database migration, corpus mutation, or rollback of any kind; no
+# secret value is ever echoed to a log (referenced only inside a `curl`
+# argument, never `echo`'d, and GitHub Actions' own log redaction masks
+# any secret value that appears in output regardless).
+#
+# Phase 22 Step 22.7 - rollback system (.github/workflows/rollback.yml,
+# scripts/rollback_target.py, tests/test_phase_22_rollback.py). This
+# step adds exactly ONE new step to the `production` job below - "Record
+# known-good release SHA" - and creates the separate rollback workflow;
+# nothing else in this job's deploy/smoke-test logic is changed.
+#
+# KNOWN-GOOD RECORDING MECHANISM ([OFFICIAL SOURCE], verified against
+# GitHub's own current documentation this session -
+# docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions
+# and docs.github.com/en/rest/actions/variables): the chosen mechanism is
+# a GitHub repository VARIABLE, `RENDER_LAST_KNOWN_GOOD_SHA` (never a
+# secret - a commit SHA is not sensitive), written via `gh variable set`
+# (GitHub CLI, already preinstalled on GitHub-hosted runners - no new
+# dependency) immediately after BOTH production deploys AND both
+# post-deploy smoke tests have succeeded (a step later in this same job
+# only runs if every step before it succeeded, by GitHub Actions' own
+# default sequential-failure behavior - no extra condition is needed to
+# express "only after everything else passed").
+#
+# PERMISSION-MODEL FINDING ([OFFICIAL SOURCE], the reason this step is
+# NOT simply "add actions: write to permissions:" - STOP-and-report per
+# this step's own instruction rather than guessing): GitHub's documented,
+# complete list of `permissions:` keys available to scope the built-in
+# `GITHUB_TOKEN` (actions, artifact-metadata, attestations, checks,
+# code-quality, contents, deployments, discussions, id-token, issues,
+# packages, pages, pull-requests, security-events, statuses,
+# vulnerability-alerts) contains NO "variables" entry - there is
+# structurally NO permission scope, at any level, that lets the default
+# `GITHUB_TOKEN` write a repository Actions variable. The REST API's own
+# docs additionally confirm that a classic PAT would need the full,
+# broad `repo` scope for this. Widening this job's `permissions:` block
+# would therefore not even work, and adding a fine-grained PAT (the
+# actual minimum: a PAT scoped ONLY to "Variables: write" on this one
+# repository) would be a NEW credential/secret this step was explicitly
+# told not to create unilaterally. Given that, this step's own "Record
+# known-good release SHA" step below ATTEMPTS the write only if an
+# operator has manually added such a PAT as the optional
+# `GH_VARIABLES_WRITE_TOKEN` secret, and fails CLOSED (skips, logs the
+# exact manual command, never guesses, never fails the whole job) when
+# that secret is absent - it does not print the token, and workflow-level
+# `permissions:` remains `contents: read`, completely unchanged.
+
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+# [ENGINEERING RECOMMENDATION] least-privilege: this workflow only reads
+# the repository to run tests - it never writes to the repo, comments on
+# a PR, creates a release, or deploys anywhere, so it needs nothing beyond
+# read access to check out the code.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend tests (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Python version (.python-version)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+          cache: "pip"
+
+      - name: Install backend dependencies (requirements-dev.txt)
+        run: pip install -r requirements-dev.txt
+
+      - name: Run backend test suite (pytest)
+        run: python -m pytest -q
+
+  frontend:
+    name: Frontend build, lint & tests (Node)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Node version (frontend/.node-version)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: "frontend/.node-version"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Install frontend dependencies (npm ci)
+        run: npm ci
+
+      - name: Lint (existing oxlint command)
+        run: npm run lint
+
+      - name: Run frontend test suite (existing vitest command)
+        run: npm test
+
+      - name: Build (existing tsc + vite build command)
+        run: npm run build
+
+  evaluation:
+    name: Evaluation gate (Phase 16 benchmark + Phase 21 corpus-refresh)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Python version (.python-version)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+          cache: "pip"
+
+      - name: Install backend dependencies (requirements-dev.txt)
+        run: pip install -r requirements-dev.txt
+
+      - name: Run evaluation gate (Phase 16 + Phase 21 corpus-refresh, deterministic synthetic fixtures only)
+        run: python -m pytest -q tests/test_phase_16_*.py tests/test_phase_21_corpus_refresh.py tests/test_phase_21_acceptance.py
+
+  release-artifact:
+    name: Release manifest (identity + integrity, no deployment)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, evaluation]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Python version (.python-version)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Build the deterministic release manifest (standard library only, no install step needed)
+        run: python scripts/build_release_manifest.py --output release_manifest.json
+
+      - name: Upload release manifest as a CI-native build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: release_manifest.json
+          if-no-files-found: error
+
+  staging:
+    name: Staging release + smoke tests (ephemeral, local to this runner)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, evaluation, release-artifact]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Record release identity for this staging run (Step 22.4's own git-SHA identity, never re-derived differently)
+        run: git rev-parse HEAD
+
+      - name: Set up pinned Python version (.python-version)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install the REAL production dependency closure (requirements-render.txt, never requirements-dev.txt)
+        run: pip install -r requirements-render.txt
+
+      - name: Start the staging backend (same start command render.yaml uses, on 127.0.0.1 only)
+        run: nohup uvicorn api.app:app --host 127.0.0.1 --port 8000 --app-dir src > staging_backend.log 2>&1 &
+
+      - name: Smoke-test the staging backend's /health contract
+        run: python scripts/staging_smoke_test.py backend --url http://127.0.0.1:8000
+
+      - name: Set up pinned Node version (frontend/.node-version)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: "frontend/.node-version"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Install frontend dependencies (npm ci)
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build the staging frontend (pointed at the staging backend via VITE_API_BASE_URL, baked in at build time)
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://127.0.0.1:8000
+
+      - name: Serve the built staging frontend locally
+        run: nohup python -m http.server 4173 --directory frontend/dist > staging_frontend.log 2>&1 &
+
+      - name: Smoke-test the staging frontend's reachability and baked-in API base URL
+        run: python scripts/staging_smoke_test.py frontend --url http://127.0.0.1:4173 --expected-api-base http://127.0.0.1:8000 --dist-dir frontend/dist
+
+      - name: Print backend/frontend staging logs on failure
+        if: failure()
+        run: |
+          echo "--- staging_backend.log ---"
+          cat staging_backend.log || true
+          echo "--- staging_frontend.log ---"
+          cat staging_frontend.log || true
+
+  production:
+    name: Production deployment (existing Phase 20 Render services, gated on every earlier check)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, evaluation, release-artifact, staging]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pinned Python version (.python-version)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Determine and verify the release identity for this exact commit (Step 22.4's own identity, never re-derived differently)
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          echo "HEAD commit SHA: ${HEAD_SHA}"
+          python scripts/build_release_manifest.py --output release_manifest.json
+          python -c "
+          import json, subprocess
+          manifest = json.load(open('release_manifest.json'))
+          head_sha = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True, check=True).stdout.strip()
+          assert manifest['content']['release_id'] == head_sha, f\"release manifest release_id {manifest['content']['release_id']} does not match HEAD {head_sha}\"
+          print(f'verified: release manifest release_id matches HEAD ({head_sha})')
+          "
+
+      - name: Deploy backend to production (Render deploy hook, pinned to this exact release commit; skipped/fails closed if not configured)
+        id: deploy_backend
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_BACKEND_DEPLOY_HOOK_URL is not configured - skipping backend production deployment (fail-closed: missing prerequisite, never simulated as successful)."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+          else
+            RELEASE_SHA="$(git rev-parse HEAD)"
+            curl -fsS -X POST "${DEPLOY_HOOK_URL}&ref=${RELEASE_SHA}" -o /dev/null
+            echo "backend deploy hook triggered for commit ${RELEASE_SHA}"
+            echo "deployed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy frontend to production (Render deploy hook, pinned to this exact release commit; skipped/fails closed if not configured)
+        id: deploy_frontend
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_FRONTEND_DEPLOY_HOOK_URL is not configured - skipping frontend production deployment (fail-closed: missing prerequisite, never simulated as successful)."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+          else
+            RELEASE_SHA="$(git rev-parse HEAD)"
+            curl -fsS -X POST "${DEPLOY_HOOK_URL}&ref=${RELEASE_SHA}" -o /dev/null
+            echo "frontend deploy hook triggered for commit ${RELEASE_SHA}"
+            echo "deployed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Smoke-test the production backend's /health contract (only if this job actually triggered a deploy and a production URL is configured)
+        if: steps.deploy_backend.outputs.deployed == 'true'
+        run: |
+          if [ -z "${{ vars.RENDER_BACKEND_PRODUCTION_URL }}" ]; then
+            echo "RENDER_BACKEND_PRODUCTION_URL is not configured - cannot smoke-test production (fail-closed: missing prerequisite, never simulated as successful)."
+            exit 1
+          fi
+          python scripts/staging_smoke_test.py backend --url "${{ vars.RENDER_BACKEND_PRODUCTION_URL }}" --attempts 30 --delay-seconds 10
+
+      - name: Smoke-test the production frontend's reachability (only if this job actually triggered a deploy and a production URL is configured)
+        if: steps.deploy_frontend.outputs.deployed == 'true'
+        run: |
+          if [ -z "${{ vars.RENDER_FRONTEND_PRODUCTION_URL }}" ]; then
+            echo "RENDER_FRONTEND_PRODUCTION_URL is not configured - cannot smoke-test production (fail-closed: missing prerequisite, never simulated as successful)."
+            exit 1
+          fi
+          python scripts/staging_smoke_test.py frontend --url "${{ vars.RENDER_FRONTEND_PRODUCTION_URL }}" --attempts 30 --delay-seconds 10
+
+      - name: Record known-good release SHA (RENDER_LAST_KNOWN_GOOD_SHA) - only reached if every step above succeeded (both deploys, both smoke tests)
+        if: steps.deploy_backend.outputs.deployed == 'true' && steps.deploy_frontend.outputs.deployed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_VARIABLES_WRITE_TOKEN }}
+        run: |
+          RELEASE_SHA="$(git rev-parse HEAD)"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "GH_VARIABLES_WRITE_TOKEN is not configured - cannot record RENDER_LAST_KNOWN_GOOD_SHA automatically."
+            echo "REASON (see this workflow's own header comment): the default GITHUB_TOKEN has no permission scope for writing repository variables - this is not a configuration oversight, it is a structural limit of GitHub Actions' own permission model."
+            echo "TO RECORD IT MANUALLY, run this yourself (requires your own repo-admin GitHub credentials, never a workflow secret): gh variable set RENDER_LAST_KNOWN_GOOD_SHA --body ${RELEASE_SHA} --repo ${{ github.repository }}"
+          else
+            gh variable set RENDER_LAST_KNOWN_GOOD_SHA --body "${RELEASE_SHA}" --repo "${{ github.repository }}"
+            echo "recorded RENDER_LAST_KNOWN_GOOD_SHA=${RELEASE_SHA}"
+          fi

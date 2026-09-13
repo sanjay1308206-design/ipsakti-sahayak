@@ -130,7 +130,15 @@ def test_no_hardcoded_secret_anywhere_in_phase_19_touched_source():
 
 
 def test_no_phase_20_or_later_directories_exist_yet():
-    for forbidden in ("deployment", "observability", "k8s", "kubernetes", ".github", "reviewers", "data", "corpus", "indexes", "index"):
+    # [ENGINEERING RECOMMENDATION] ".github" removed from this list: Phase
+    # 22 (CI/CD & Production Release) legitimately introduces
+    # .github/workflows/ci.yml (docs/PHASE_22_CICD_PRODUCTION_RELEASE.md),
+    # the same disclosed pattern already used when Phase 20/21 arrived
+    # (e.g. Phase 6 relaxing Phase 4/5's dependency checks, Phase 17
+    # dropping fastapi from ten earlier forbidden-dependency lists) -
+    # never a silent removal, and every other forbidden name here is
+    # unchanged and still enforced.
+    for forbidden in ("deployment", "observability", "k8s", "kubernetes", "reviewers", "data", "corpus", "indexes", "index"):
         assert not (REPO_ROOT / forbidden).exists(), f"'{forbidden}/' would imply Phase 20+ functionality, which Phase 19 must not create"
 
 

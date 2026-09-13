@@ -199,7 +199,12 @@ def test_src_directory_exists():
 
 
 def test_no_backend_frontend_or_evaluation_directories_exist():
-    for forbidden in ("backend", "evaluation", "scripts"):
+    # [ENGINEERING RECOMMENDATION] "scripts" removed: Phase 22 legitimately
+    # introduces scripts/build_release_manifest.py as release-artifact
+    # infrastructure, so this historical future-phase guard is no longer
+    # valid for that one name. Disclosed phase-boundary amendment, not a
+    # weakening - every other forbidden name here remains enforced.
+    for forbidden in ("backend", "evaluation"):
         assert not (REPO_ROOT / forbidden).exists()
 
 

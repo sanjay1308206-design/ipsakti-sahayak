@@ -1,0 +1,185 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 21 machine-readable contract: Observability, Backup & Corpus Refresh.
+#
+# Source of truth: PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf
+# Human-readable companion: docs/PHASE_21_OBSERVABILITY_BACKUP_CORPUS_REFRESH.md
+# Machine-readable acceptance source: config/acceptance_contract.yaml (CAP-21)
+# Implementation: NONE YET — this file is a contract, written before any
+# Phase 21 code, test, or dependency exists. status below reflects that.
+#
+# CRITICAL: this contract does NOT grant Phase 21 authority over any
+# Phase 0-20 domain decision, deployment configuration, or dependency set.
+# It only observes what the existing, unmodified system already does, and
+# defines how a corpus update may later be validated/re-indexed/evaluated/
+# released safely. Nothing in this file is implemented by creating it.
+
+contract_version: "1.0.0"
+
+phase:
+  id: 21
+  name: "Observability, Backup & Corpus Refresh"
+  status: "IMPLEMENTATION_PENDING"
+
+objective: "Operate the system after deployment."
+
+# docs/PHASE_21_OBSERVABILITY_BACKUP_CORPUS_REFRESH.md Section 2/3.
+scope:
+  in_scope:
+    - "metrics"
+    - "logs"
+    - "latency_tracking"
+    - "retrieval_diagnostics"
+    - "citation_rejection_rate"
+    - "abstention_rate"
+    - "backup"
+    - "restore"
+    - "corpus_refresh_pipeline"
+  reused_contracts:
+    - "src/api/errors.py - existing server-side exception logging (Phase 17 Section Y); extended, never replaced."
+    - "src/citation/metrics.py - CitationCoverageMetrics (Phase 9); citation_rejection_rate is derived from it, never recomputed."
+    - "src/generation/models.py - ABSTENTION_REASONS / GroundedResponse.abstention_reason (Phase 10)."
+    - "src/safety/evaluator.py - SafetyDecision.safety_status (Phase 13); abstention_rate is derived from these two vocabularies together."
+    - "src/evaluation/benchmark.py + src/evaluation/metrics.py - safe_rate/build_rate_result/build_not_run_result/compute_report_id pattern (Phase 16); reused, never duplicated."
+    - "src/retrieval/evaluation.py - precision_at_k/recall_at_k/reciprocal_rank/mean_reciprocal_rank (Phase 5/6)."
+    - "src/ingestion/pipeline.py (ingest_bytes/ingest_document) + src/ingestion/admission.py (check_admission_boundary, load_authority_matrix) - Phase 3 admission/extraction, composed not reimplemented."
+    - "config/corpus_lock.yaml - Phase 2 corpus governance; a refresh can never admit anything this file does not already permit."
+
+# docs Section 6-11.
+metrics:
+  status: "not_implemented"
+  aggregation_scope: "reads already-real Phase 9/13/16 objects only - never calls a decision-making function itself (no re-classification/re-grounding/re-safety-evaluation for measurement purposes)"
+  report_pattern: "reuses evaluation.metrics.safe_rate / build_rate_result / build_not_run_result (Phase 16 zero-denominator policy) - never a second, independently-invented rate calculation"
+
+logging:
+  status: "not_implemented"
+  convention: "extends src/api/errors.py's existing Python stdlib logging usage - server-side only, never returned to a client"
+  constraints:
+    - "no secret, credential, or full raw query/evidence payload logged beyond what Phase 17 already logs today"
+    - "no log-aggregation service in this phase (see deferred)"
+
+latency:
+  status: "not_implemented"
+  measurement_point: "wraps application.service.ApplicationService.query from the outside - never edits inside it"
+  per_stage_breakdown: "ASSUMPTION - only in scope if ApplicationService already exposes stage boundaries without modification; not assumed true here"
+
+retrieval_diagnostics:
+  status: "not_implemented"
+  source: "retrieval.evaluation.precision_at_k / recall_at_k / reciprocal_rank / mean_reciprocal_rank - reused verbatim, no new IR metric defined"
+
+citation_rejection_rate:
+  status: "not_implemented"
+  definition: "(invalid_count + unresolved_count) / total_references, from citation.metrics.CitationCoverageMetrics"
+  zero_denominator_policy: "None when total_references == 0 - never a fabricated 0.0 (evaluation.metrics.safe_rate)"
+
+abstention_rate:
+  status: "not_implemented"
+  definition: "count(safety_status == \"ABSTAIN\") / total_requests_evaluated"
+  optional_breakdown: "by GroundedResponse.abstention_reason (generation.models.ABSTENTION_REASONS) when available - no new abstention taxonomy invented"
+
+# docs Section 12-16.
+backup:
+  status: "not_implemented"
+  target: "ASSUMPTION - a filesystem corpus/index snapshot artifact (admitted documents + chunk set + retrieval index state), content-hashed and versioned; NOT a database backup"
+  target_rationale: "no database, ORM, or persistence layer exists anywhere in the repository (Phase 17 Section W, unchanged) - inventing a database backup would violate Rule 6 (No Premature Dependencies)"
+  assumption_invalidated_if:
+    - "a future phase introduces a real database/managed persistence layer for corpus/index state"
+    - "explicit instruction promotes cloud object storage into scope"
+  contents:
+    - "admitted document provenance records (Phase 2/3 schema fields, config/corpus_provenance_schema.yaml)"
+    - "derived chunk set (Phase 4)"
+    - "retrieval index artifacts (Phase 5/6, whichever exist)"
+    - "one manifest: snapshot_id, created_at, corpus_lock lock_version in effect, whole-snapshot content hash"
+  integrity_verification: "per-document hashes via ingestion.hashing.compute_content_hash (Phase 3) + one deterministic manifest hash (SHA-256 over canonical manifest fields, matching every other phase's own deterministic-identity convention)"
+  restore_verification: "every integrity hash must re-verify before anything is loaded; any mismatch rejects the entire snapshot, never a partial restore"
+  fail_safe_behavior: "a failed restore leaves whatever was active before the attempt untouched and logged - never silently retried against a different snapshot"
+
+# docs Section 17-19.
+corpus_refresh:
+  status: "not_implemented"
+  lifecycle: ["validate", "re-index", "evaluate", "release"]
+  validate: "ingestion.admission.check_admission_boundary + ingestion.pipeline.ingest_bytes/ingest_document against the unmodified config/corpus_lock.yaml + config/authority_matrix.yaml"
+  re_index: "existing, unmodified Phase 4 chunking + Phase 5/6 BM25/dense index build stages"
+  evaluate: "existing, unmodified evaluation.benchmark / retrieval.evaluation / citation.metrics machinery (Phase 9/16) - never skipped, never replaced by a weaker check"
+  release: "a pointer/reference switch to a fully-verified snapshot; never an in-place mutation of the previously-active snapshot"
+
+release_gate:
+  rule: "validate -> index -> evaluate -> release, never update -> release -> discover problems"
+  fail_closed: true
+  conditions:
+    failed_validation_blocks_release: true
+    failed_indexing_blocks_release: true
+    failed_evaluation_blocks_release: true
+    corrupted_snapshot_blocks_release: true
+  on_failure: "existing active release remains intact and continues serving unchanged"
+
+dry_run:
+  required_for_acceptance: true
+  behavior: "executes validate -> re-index -> evaluate in full and reports the real result, but never performs the release step - the currently-active snapshot is left untouched regardless of outcome"
+  source: "CAP-21 test_requirement: 'corpus refresh dry run'"
+
+determinism:
+  required: true
+  scope:
+    - "snapshot_id, manifest hash, and evaluation report IDs must be deterministic functions of their own canonical inputs - never a random UUID or wall-clock timestamp used as identity"
+    - "given identical inputs, a dry run and a real run of the same candidate corpus must produce identical evaluation results"
+
+# docs Section 20.
+synthetic_fixtures:
+  required: true
+  rationale: "no real corpus is ingested anywhere in this repository today - confirmed repeatedly by Phase 10/17's own regression checks"
+  convention: "reuses existing tests/_*_fixtures.py where they fit, following Phase 16's synthetic=True / SYNTHETIC-*-ID convention - never a real regulatory document"
+
+# docs Section 4/24/29.
+non_goals:
+  - "database backup"
+  - "redis"
+  - "cloud_object_storage"
+  - "paid_monitoring"
+  - "external_apm"
+  - "advanced_analytics_beyond_phase_21_operational_scope"
+  - "phase_22_ci_cd"
+  - "phase_23_production_validation"
+  - "gemini_integration"
+  - "reimplementing any Phase 3-16 domain logic"
+  - "authentication/authorization or rate limiting beyond existing Phase 17/19 boundaries"
+  - "modifying render.yaml or requirements-render.txt"
+
+dependencies:
+  policy: "no new dependency unless implementation proves it is strictly required by this contract"
+  new_dependencies_introduced_by_this_file: []
+
+# docs Section 15/23.
+assumptions:
+  - id: "backup_target_is_filesystem_snapshot"
+    statement: "the Phase 21 backup target is a filesystem corpus/index snapshot, not a database backup"
+    status: "ASSUMPTION - not a hard requirement"
+    invalidated_if: "a future phase introduces a real database/managed persistence layer, or explicit instruction promotes cloud storage into scope"
+  - id: "per_stage_latency_availability"
+    statement: "per-stage latency breakdown is only in scope if ApplicationService already exposes stage boundaries without modification"
+    status: "ASSUMPTION - not a hard requirement"
+    invalidated_if: "implementation-time inspection confirms ApplicationService already exposes per-stage timing hooks without modification"
+  - id: "release_pointer_mechanism"
+    statement: "the exact release-pointer mechanism (file / env var / manifest entry) is an implementation detail, not fixed by this contract"
+    status: "ASSUMPTION - not a hard requirement"
+    invalidated_if: "implementation chooses a specific mechanism - this contract only requires the previous snapshot stays intact until explicitly discarded"
+
+# docs Section 27/28, CAP-21 acceptance_criterion.
+acceptance:
+  criteria:
+    - "backup/restore test exists and passes"
+    - "corpus-refresh dry run exists and passes"
+    - "a corpus update can be validated, re-indexed, evaluated, and released safely"
+    - "an invalid or failed update can never become the active corpus/index"
+    - "full Phase 0-20 regression suite remains passing, unweakened"
+  source: "config/acceptance_contract.yaml CAP-21"
+
+# docs Section 29.
+deferred:
+  - "external metrics/log/monitoring service integration"
+  - "real database or managed persistence layer for corpus/index state"
+  - "cloud object storage for backups"
+  - "per-stage latency breakdown (pending assumption resolution above)"
+  - "advanced observability/analytics beyond Phase 21 operational scope (acceptance_contract.yaml DEF-07)"
+  - "CI/CD automation of the refresh workflow (Phase 22)"
+  - "production-validation sign-off against the Final Production Gate (Phase 23)"
+  - "a live Gemini/Qwen/Bhashini provider (Phase 10/14's own deferred boundary, unchanged)"

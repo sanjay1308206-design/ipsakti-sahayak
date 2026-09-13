@@ -126,7 +126,15 @@ def test_api_and_application_source_directories_contain_expected_files():
 
 
 def test_no_frontend_deployment_or_observability_directories_exist():
-    for forbidden in ("deployment", "observability", "k8s", "kubernetes", ".github/workflows"):
+    # [ENGINEERING RECOMMENDATION] ".github/workflows" removed from this
+    # list: Phase 22 (CI/CD & Production Release) legitimately introduces
+    # .github/workflows/ci.yml (docs/PHASE_22_CICD_PRODUCTION_RELEASE.md),
+    # the same disclosed pattern already used when Phase 20/21 arrived
+    # (e.g. Phase 6 relaxing Phase 4/5's dependency checks, Phase 17
+    # dropping fastapi from ten earlier forbidden-dependency lists) -
+    # never a silent removal, and every other forbidden name here is
+    # unchanged and still enforced.
+    for forbidden in ("deployment", "observability", "k8s", "kubernetes"):
         assert not (REPO_ROOT / forbidden).exists()
 
 

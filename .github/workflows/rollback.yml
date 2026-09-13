@@ -1,0 +1,211 @@
+# PS 26045 — IP-SAKTI Sahayak
+# Phase 22 Step 22.7 — Rollback System.
+#
+# [ENGINEERING RECOMMENDATION] This is a SEPARATE workflow file from
+# .github/workflows/ci.yml, deliberately - rollback is an OPERATOR-
+# INITIATED action, never a push/PR-triggered CI gate, so it must never
+# share ci.yml's `on: push/pull_request` triggers. Triggered ONLY by
+# `workflow_dispatch` (manual, from the GitHub Actions UI/API/CLI) - no
+# `schedule`, no `push`, no `pull_request`, no `workflow_run`. This
+# workflow never modifies `main`, never commits, never pushes, and never
+# alters `render.yaml` or any production configuration file - it only
+# calls the existing Phase 22.6 Render deploy hooks with a different
+# `ref=` value than the `production` job would use.
+#
+# KNOWN-GOOD RELEASE DEFINITION (docs/PHASE_22_CICD_PRODUCTION_RELEASE.md
+# "Rollback System"): a commit qualifies as known-good ONLY when it
+# passed backend+frontend CI, the evaluation gate, produced a release
+# artifact, passed staging, AND both backend/frontend PRODUCTION deploys
+# succeeded AND both post-deploy smoke tests passed - recorded by the
+# `production` job (ci.yml) into the `RENDER_LAST_KNOWN_GOOD_SHA`
+# repository VARIABLE (never a secret - a commit SHA is not sensitive)
+# only after every one of those conditions held. A commit that merely
+# passed CI is NOT a valid rollback target by this definition.
+#
+# TARGET RESOLUTION: an explicit `target_sha` input always wins (an
+# operator deliberately rolling back further than one step); when left
+# empty, this falls back to `vars.RENDER_LAST_KNOWN_GOOD_SHA`. Reading a
+# repository variable needs no special permission (same as the
+# `production` job's own `vars.RENDER_BACKEND_PRODUCTION_URL` read) -
+# only WRITING one does (see ci.yml's own header comment for the
+# permission-model finding that blocks fully-automated writing today).
+#
+# VALIDATION (scripts/rollback_target.py, reusing conventions established
+# by scripts/build_release_manifest.py - REPO_ROOT imported, never
+# redefined): exactly 40 lowercase hex characters, a real commit object in
+# this repository, and reachable from the triggering branch's history -
+# never an arbitrary, unvalidated, operator-typed string.
+#
+# MANIFEST: the target commit is checked out FIRST, then
+# scripts/build_release_manifest.py (unchanged, the SAME Step 22.4
+# script - never a second manifest format) is run against that checked-
+# out tree and its own `release_id` is cross-checked against the target
+# SHA - proving the manifest genuinely corresponds to the commit about to
+# be redeployed.
+#
+# BACKEND/FRONTEND CONSISTENCY: both deploy hooks are reused UNCHANGED
+# from Step 22.6 (`RENDER_BACKEND_DEPLOY_HOOK_URL`,
+# `RENDER_FRONTEND_DEPLOY_HOOK_URL` - no new hook secret is created), each
+# called with the SAME resolved `ref=<target_sha>` output value, so both
+# services always land on the identical commit. A pre-flight check
+# refuses to trigger EITHER deploy if EITHER secret is absent (never a
+# partial deploy caused by missing configuration). A genuine mid-flight
+# failure of only one deploy call IS still possible (e.g. a transient
+# Render-side error) - that is detected explicitly afterward and reported
+# as a loud failure naming which service is now inconsistent; this
+# workflow never retries and never attempts an automatic corrective
+# second deployment.
+#
+# POST-ROLLBACK VERIFICATION: reuses scripts/staging_smoke_test.py
+# UNCHANGED (the same Step 22.5/22.6 script) against
+# `vars.RENDER_BACKEND_PRODUCTION_URL`/`vars.RENDER_FRONTEND_PRODUCTION_URL`.
+# LIMITATION, disclosed rather than hidden: `GET /health`
+# (`src/api/schemas.py::HealthResponse`, Phase 17, unchanged) carries no
+# git-commit field, so a passing smoke test proves the service is alive
+# and answers its documented contract - it does NOT independently prove
+# the exact deployed commit is `target_sha` (that would require either
+# trusting Render's own `ref=` deploy-hook mechanism, or a Render API
+# call this project has no credential for). The manifest-validation step
+# above is the strongest verification available before triggering the
+# deploy; the smoke test only verifies liveness afterward.
+#
+# SAFETY: no database, no Docker, no paid infrastructure, no new
+# dependency (Python standard library + `curl`, both already used by the
+# `production` job), no external/third-party repository is ever
+# referenced. No secret value is ever echoed - each is read into an env
+# var and used only inside a `curl` argument, never printed, and GitHub
+# Actions' own log redaction masks any secret value that appears in
+# output regardless.
+#
+# LIVE-TEST DEFERRED (docs "Rollback System" Section, [DEFERRED]): this
+# workflow cannot be exercised end-to-end against a real Render service
+# until Step 22.6's own production deployment has succeeded at least
+# once - today, no live deployment has occurred and no credentials are
+# configured, so this workflow has been validated only structurally
+# (tests/test_phase_22_rollback.py) and via scripts/rollback_target.py's
+# own unit tests against this repository's real git history - never
+# against a live Render endpoint.
+
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Full 40-character git commit SHA to roll back to. Leave empty to use the recorded RENDER_LAST_KNOWN_GOOD_SHA repository variable."
+        required: false
+        default: ""
+
+# [ENGINEERING RECOMMENDATION] least-privilege: this workflow only reads
+# the repository (to validate and check out the rollback target) and
+# calls the existing Render deploy hooks - it never writes to the repo,
+# never creates a release, and never needs elevated permissions.
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    name: Roll back production to a validated prior commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository with full history (a shallow clone cannot validate an older target commit)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pinned Python version (.python-version)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Resolve the rollback target SHA (explicit input, or RENDER_LAST_KNOWN_GOOD_SHA fallback; fails closed if neither exists)
+        id: resolve_target
+        env:
+          INPUT_TARGET_SHA: ${{ github.event.inputs.target_sha }}
+          KNOWN_GOOD_SHA: ${{ vars.RENDER_LAST_KNOWN_GOOD_SHA }}
+        run: python scripts/rollback_target.py resolve --input-sha "$INPUT_TARGET_SHA" --known-good-sha "$KNOWN_GOOD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Validate the rollback target commit (format, existence, reachability from this branch's history)
+        run: python scripts/rollback_target.py validate --sha "${{ steps.resolve_target.outputs.target_sha }}" --ref "HEAD"
+
+      - name: Check out the exact, validated target commit
+        run: git checkout "${{ steps.resolve_target.outputs.target_sha }}"
+
+      - name: Build and validate the release manifest AT the target commit (reused Step 22.4 script, never a new format)
+        run: |
+          python scripts/build_release_manifest.py --output rollback_release_manifest.json
+          python -c "
+          import json
+          manifest = json.load(open('rollback_release_manifest.json'))
+          target_sha = '${{ steps.resolve_target.outputs.target_sha }}'
+          assert manifest['content']['release_id'] == target_sha, f\"release manifest release_id {manifest['content']['release_id']} does not match target commit {target_sha}\"
+          print(f'verified: release manifest at the target commit matches {target_sha}')
+          "
+
+      - name: Verify both Render deploy-hook secrets are configured (fail closed BEFORE attempting either deploy - never a partial deploy caused by missing configuration)
+        env:
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+          FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          MISSING=""
+          if [ -z "$BACKEND_HOOK" ]; then MISSING="${MISSING} RENDER_BACKEND_DEPLOY_HOOK_URL"; fi
+          if [ -z "$FRONTEND_HOOK" ]; then MISSING="${MISSING} RENDER_FRONTEND_DEPLOY_HOOK_URL"; fi
+          if [ -n "$MISSING" ]; then
+            echo "Cannot roll back: the following required secret(s) are not configured:${MISSING}"
+            echo "Fail-closed: refusing to trigger a deploy for either service until BOTH deploy hooks are configured (never a partial deploy)."
+            exit 1
+          fi
+          echo "both deploy-hook secrets are present - proceeding"
+
+      - name: Roll back backend to the target commit (Render deploy hook, ref=<target_sha>)
+        id: rollback_backend
+        continue-on-error: true
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "${DEPLOY_HOOK_URL}&ref=${{ steps.resolve_target.outputs.target_sha }}" -o /dev/null
+          echo "backend rollback deploy hook triggered for commit ${{ steps.resolve_target.outputs.target_sha }}"
+          echo "rolled_back=true" >> "$GITHUB_OUTPUT"
+
+      - name: Roll back frontend to the target commit (Render deploy hook, ref=<target_sha>)
+        id: rollback_frontend
+        continue-on-error: true
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "${DEPLOY_HOOK_URL}&ref=${{ steps.resolve_target.outputs.target_sha }}" -o /dev/null
+          echo "frontend rollback deploy hook triggered for commit ${{ steps.resolve_target.outputs.target_sha }}"
+          echo "rolled_back=true" >> "$GITHUB_OUTPUT"
+
+      - name: Detect and report a partial rollback (one service rolled back, the other did not) - never silently reported as success, never auto-retried
+        run: |
+          BACKEND_OK="${{ steps.rollback_backend.outcome }}"
+          FRONTEND_OK="${{ steps.rollback_frontend.outcome }}"
+          if [ "$BACKEND_OK" != "$FRONTEND_OK" ]; then
+            echo "PARTIAL ROLLBACK DETECTED: backend deploy outcome=${BACKEND_OK}, frontend deploy outcome=${FRONTEND_OK}."
+            echo "The two production services are now INCONSISTENT (different commits deployed). This workflow does NOT retry or self-heal - manual investigation and a manual re-run is required."
+            exit 1
+          fi
+          if [ "$BACKEND_OK" != "success" ]; then
+            echo "Rollback FAILED for both services (deploy hook call itself failed for both - see the two rollback steps above for details)."
+            exit 1
+          fi
+          echo "both services accepted the rollback deploy hook call for the same target commit"
+
+      - name: Smoke-test the rolled-back production backend's /health contract
+        if: steps.rollback_backend.outcome == 'success' && steps.rollback_frontend.outcome == 'success'
+        run: |
+          if [ -z "${{ vars.RENDER_BACKEND_PRODUCTION_URL }}" ]; then
+            echo "RENDER_BACKEND_PRODUCTION_URL is not configured - cannot verify the rollback (fail-closed: the deploy hook was called, but its result cannot be confirmed)."
+            exit 1
+          fi
+          python scripts/staging_smoke_test.py backend --url "${{ vars.RENDER_BACKEND_PRODUCTION_URL }}" --attempts 30 --delay-seconds 10
+
+      - name: Smoke-test the rolled-back production frontend's reachability
+        if: steps.rollback_backend.outcome == 'success' && steps.rollback_frontend.outcome == 'success'
+        run: |
+          if [ -z "${{ vars.RENDER_FRONTEND_PRODUCTION_URL }}" ]; then
+            echo "RENDER_FRONTEND_PRODUCTION_URL is not configured - cannot verify the rollback (fail-closed: the deploy hook was called, but its result cannot be confirmed)."
+            exit 1
+          fi
+          python scripts/staging_smoke_test.py frontend --url "${{ vars.RENDER_FRONTEND_PRODUCTION_URL }}" --attempts 30 --delay-seconds 10

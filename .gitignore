@@ -61,6 +61,11 @@ node_modules/
 frontend/dist/
 frontend/build/
 
+# --- Release artifacts (Phase 22 Step 22.4, generated - never committed) ---
+# scripts/build_release_manifest.py's own output; CI uploads it as a
+# GitHub-native build artifact instead (actions/upload-artifact).
+/release_manifest.json
+
 # --- OS / editor files ---
 .DS_Store
 Thumbs.db

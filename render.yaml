@@ -28,6 +28,18 @@
 # variables are statically replaced at build time, never read at
 # runtime), so the frontend's first real build must happen (or be
 # re-triggered) only after the backend service's URL is known.
+#
+# AUTO-DEPLOY LOCK (Phase 22 Step 22.6, [ENGINEERING RECOMMENDATION]):
+# `autoDeployTrigger: off` on both services below is deliberate. Render's
+# own documented default when this field is omitted is `commit` (deploy
+# on every push to the connected branch) - that would let a push to
+# `main` deploy production independently of, and bypassing, the
+# GitHub Actions `production` job's own CI/evaluation/staging gates
+# (.github/workflows/ci.yml). The GitHub Actions deploy-hook path (with
+# its own `ref=<commit-sha>` pin) is this project's ONE, sole controlled
+# production-deployment authority - `checksPass` was deliberately not
+# used here either, since it would still leave a second, Render-side
+# auto-deploy path active alongside the explicit deploy-hook path.
 
 services:
   - name: ipsakti-backend
@@ -35,6 +47,7 @@ services:
     runtime: python
     plan: free
     rootDir: .
+    autoDeployTrigger: off
     buildCommand: pip install -r requirements-render.txt
     # api.app:app matches src/api/app.py's module-level `app = create_app()`
     # (docs/PHASE_17_BACKEND_PRODUCTIZATION.md Section D/E). --app-dir src
@@ -58,6 +71,7 @@ services:
     type: web
     runtime: static
     rootDir: frontend
+    autoDeployTrigger: off
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
