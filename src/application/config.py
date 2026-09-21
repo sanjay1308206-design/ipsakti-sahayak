@@ -35,8 +35,13 @@ class EnvironmentConfig:
     """
     Environment-variable-derived configuration only. `[ENGINEERING
     RECOMMENDATION]` No API key, token, password, or credential is ever
-    read, stored, or exposed by this class - none is needed anywhere in
-    Phase 17 (no live Gemini/Qwen/Bhashini adapter exists, docs Section V).
+    read, stored, or exposed by this class, by design - a real generation
+    provider credential now exists at runtime (LD-1,
+    `GENERATION_API_KEY`), but it is read exclusively by
+    `generation.provider_factory.build_generation_provider_from_env` and
+    handed straight into a provider constructor, deliberately never
+    stored on this (or any other) long-lived, potentially-logged/
+    serialized dataclass instance.
     """
 
     cors_allowed_origins: tuple = ()

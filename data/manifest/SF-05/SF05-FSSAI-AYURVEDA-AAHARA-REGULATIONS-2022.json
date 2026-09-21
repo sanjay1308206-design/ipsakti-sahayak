@@ -1,0 +1,26 @@
+{
+  "admission_status": "ADMIT_WITH_RESTRICTION",
+  "conflict_status": "NONE",
+  "content_hash": "1ae8cfc632fad0a775316a84999a48adb6cf4b47d05bd4faa75f5190c511f699",
+  "document_id": "SF05-FSSAI-AYURVEDA-AAHARA-REGULATIONS-2022",
+  "document_type": "Gazette Notification",
+  "effective_date": "2022-05-06",
+  "effective_date_known": true,
+  "jurisdiction": "INDIA",
+  "known_conflicting_with": [],
+  "notes": "Notification dateline (New Delhi): 5 May 2022. Gazette of India, Extraordinary, Part III, Section 4, issue No. 240, issue date 6 May 2022 (Friday) / Vaisakha 16, 1944 (Saka) - used as publication_date/effective_date per the regulation's own commencement clause ('shall come into force from the date of publication in the Gazette of India'). The source filename itself carries a third date token, 09_05_2022, which does not match either of the above and is presumed to be FSSAI's website upload date, not a regulatory date - preserved here as a disclosed discrepancy, not silently reconciled. Gazette tracking: 3092 GI/2022 (1), REGD. No. D.L.-33004/99. Issuing authority: Food Safety and Standards Authority of India (FSSAI). Identity independently verified against the actual downloaded PDF text (Phase 23.3 Step 2C) - not inferred from filename/URL alone.",
+  "provenance_status": "PARTIAL",
+  "publication_date": "2022-05-06",
+  "restriction_reason": [
+    "VERSION_NOT_ESTABLISHED",
+    "SUPERSESSION_STATUS_UNKNOWN"
+  ],
+  "retrieved_at": "2026-09-13T00:00:00+00:00",
+  "source_family_id": "SF-05",
+  "source_reference": "https://stg-old.fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf",
+  "supersession_status": "UNKNOWN",
+  "synthetic": false,
+  "title": "Food Safety and Standards (Ayurveda Aahara) Regulations, 2022",
+  "validation_status": "VALIDATED",
+  "version_known": false
+}

@@ -51,12 +51,29 @@ GOLDEN_SOURCE_FAMILY_NAMES = frozenset(
 
 # URLs verbatim from the Master Reference's own "Research Sources &
 # Provenance" list - used to prove nothing was invented.
+#
+# [ENGINEERING RECOMMENDATION] SF-05 exception (Phase 23.3 Step 2E): the
+# Master Reference's own text names the historical URL below, but that
+# URL has since gone stale in production - it now returns FSSAI's SPA
+# HTML shell (HTTP 200) instead of the PDF, confirmed directly (Phase
+# 23.3 Step 2 acquisition attempt). Phase 23.3 Step 2C independently
+# verified a replacement, still-official FSSAI URL by downloading and
+# inspecting the actual document: 2,307,105 bytes, SHA-256
+# 1ae8cfc632fad0a775316a84999a48adb6cf4b47d05bd4faa75f5190c511f699, 27
+# pages, text confirming "Food Safety and Standards (Ayurveda Aahara)
+# Regulations, 2022" (Gazette of India No. 240, notification dateline 5
+# May 2022, issuing authority FSSAI) - the identical document, not a
+# different one. `config/authority_matrix.yaml` (Phase 23.3 Step 2D) was
+# updated accordingly, so this expectation intentionally tracks the
+# currently verified official access point rather than the Master
+# Reference's now-dead literal text for SF-05 only - every other entry
+# below remains the Master Reference's own unmodified original URL.
 EXPECTED_URLS = {
     "SF-01": "https://www.indiacode.nic.in/",
     "SF-02": "https://ipindia.gov.in/",
     "SF-03": "https://ayush.gov.in/",
     "SF-04": "https://www.cdsco.gov.in/opencms/opencms/en/Traditional_Drugs/",
-    "SF-05": "https://fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf",
+    "SF-05": "https://stg-old.fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf",
     "SF-06": "https://www.wipo.int/en/web/traditional-knowledge/wipo-treaty-on-ip-gr-and-associated-tk",
     "SF-08": "https://app.bhashini.ai/translate",
 }

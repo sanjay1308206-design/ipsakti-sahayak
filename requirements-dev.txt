@@ -202,3 +202,14 @@ fastapi>=0.136,<0.137
 pydantic>=2,<3
 uvicorn>=0.42,<0.43
 httpx>=0.28,<0.29
+
+# --- LD-1: Production Generation Provider ---
+# google-genai: same package/version range as requirements-render.txt
+# (see that file for the full rationale) - needed here so this
+# repository's own LD-1 provider/factory tests
+# (tests/test_ld1_gemini_provider.py, tests/test_ld1_provider_factory.py)
+# can import and construct `GeminiGenerationProvider` directly (with the
+# Gemini API itself mocked/monkeypatched - no test in this suite makes a
+# real network call or requires a real API key). Never imported by any
+# test that does not explicitly exercise the Gemini adapter.
+google-genai>=2,<3

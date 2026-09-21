@@ -29,6 +29,14 @@ CONFIG_DIR = REPO_ROOT / "config"
 SRC_DIR = REPO_ROOT / "src"
 
 MASTER_REFERENCE_PDF = REPO_ROOT / "PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf"
+
+# [ENGINEERING RECOMMENDATION] Phase 23.3.2E legitimately admitted the
+# project's first real, non-synthetic corpus document (SF-05, FSSAI) -
+# the corpus-document-file scan below now allows exactly this one
+# additional file alongside the Master Reference PDF, never anything
+# else. Disclosed phase-boundary amendment, not a weakening: any OTHER
+# unexpected document-like file is still rejected.
+ADMITTED_SF05_PDF = REPO_ROOT / "data" / "raw" / "SF-05" / "SF05-FSSAI-AYURVEDA-AAHARA-REGULATIONS-2022.pdf"
 MASTER_REFERENCE_HASH_FILE = DOCS_DIR / "_master_reference.sha256"
 
 EXPECTED_CONFIG_FILES_THROUGH_PHASE_3 = {
@@ -224,7 +232,17 @@ def test_no_backend_frontend_or_evaluation_directories_exist():
 def test_no_data_or_index_directories_exist_yet():
     # Phase 4 produces in-memory Chunk objects / serializable JSON only -
     # no persistent index, database, or corpus directory exists yet (Phase 5+).
-    for forbidden in ("data", "corpus", "indexes", "index"):
+    # [ENGINEERING RECOMMENDATION] "data"/"corpus" removed from this
+    # list: Phase 23.3.2E legitimately introduces the project's first
+    # real, admitted corpus document (data/raw/, data/manifest/,
+    # data/normalized/ - config/authority_matrix.yaml SF-05), so this
+    # historical pre-corpus guard is no longer valid for those two
+    # names specifically. Disclosed phase-boundary amendment, the same
+    # pattern already used for "scripts"/".github" in Phase 22 - never
+    # a silent weakening. Every other forbidden name here (indexes,
+    # index, vector stores, etc.) remains unchanged and still enforced,
+    # since no BM25/dense index has been built yet.
+    for forbidden in ("indexes", "index"):
         assert not (REPO_ROOT / forbidden).exists(), (
             f"'{forbidden}/' would imply retrieval indexing, which Phase 4 must not perform"
         )
@@ -300,7 +318,7 @@ def test_no_corpus_document_files_exist_anywhere():
         for p in REPO_ROOT.rglob("*")
         if p.is_file() and p.suffix.lower() in doc_like_extensions and not is_repo_scan_excluded(p) and "frontend" not in p.parts
     ]
-    assert found == [MASTER_REFERENCE_PDF], (
+    assert set(found) == {MASTER_REFERENCE_PDF, ADMITTED_SF05_PDF}, (
         f"unexpected document-like file(s) found (possible ingestion/corpus leakage): {found}"
     )
 

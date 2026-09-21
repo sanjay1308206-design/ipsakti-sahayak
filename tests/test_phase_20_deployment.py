@@ -20,6 +20,10 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 
 EXPECTED_DEV_DEPENDENCIES = {
     "pytest", "pyyaml", "pypdf", "sentence-transformers", "faiss-cpu", "numpy", "fastapi", "pydantic", "uvicorn", "httpx",
+    # LD-1 (Production Generation Provider, post-Phase-23): see
+    # test_phase_19_regression.py::EXPECTED_PY_DEPENDENCIES for the same
+    # addition and its rationale.
+    "google-genai",
 }
 # [OUR ENHANCEMENT] Phase 20.4-B Fix 1 + Fix 2: numpy/faiss-cpu/PyYAML
 # were added, one real Render deployment failure at a time
@@ -37,7 +41,16 @@ EXPECTED_DEV_DEPENDENCIES = {
 # `CrossEncoderReranker`'s own load methods, never called by the default
 # path). `pytest`/`httpx` remain forbidden - test-only, never imported by
 # `src/api/`/`src/application/` or anything they call.
-EXPECTED_RENDER_DEPENDENCIES = {"fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml"}
+EXPECTED_RENDER_DEPENDENCIES = {
+    "fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml",
+    # LD-1 (Production Generation Provider, post-Phase-23): required at
+    # deployed-app STARTUP only when GENERATION_PROVIDER=gemini is
+    # actually set (generation/gemini_provider.py imports it lazily) -
+    # declared unconditionally here anyway, matching this file's own
+    # existing "declare the full possible runtime closure" convention
+    # for numpy/faiss-cpu/pyyaml above.
+    "google-genai",
+}
 FORBIDDEN_RENDER_DEPENDENCIES = {"pytest", "pypdf", "sentence-transformers", "httpx", "torch", "transformers"}
 
 SECRET_ASSIGNMENT_PATTERN = re.compile(

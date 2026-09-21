@@ -66,6 +66,24 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: "3.10.11"
+      # LD-1 (Production Generation Provider): read once, at process
+      # startup, by src/generation/provider_factory.py -
+      # src/api/dependencies.py wires the resulting provider into
+      # ApplicationService. All three are `sync: false` (never a value
+      # committed here, per this file's own existing convention above) -
+      # GENERATION_API_KEY in particular is a real credential and MUST be
+      # set only through the Render dashboard's own secret-value entry,
+      # never through this file. Leaving GENERATION_PROVIDER unset keeps
+      # today's existing, unchanged fail-closed behavior (HTTP 503,
+      # GENERATION_PROVIDER_NOT_CONFIGURED) - setting it is what actually
+      # enables live generation, and is a deliberate, separate action
+      # from committing this file.
+      - key: GENERATION_PROVIDER
+        sync: false
+      - key: GENERATION_MODEL
+        sync: false
+      - key: GENERATION_API_KEY
+        sync: false
 
   - name: ipsakti-frontend
     type: web

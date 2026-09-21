@@ -138,7 +138,23 @@ source_families:
     allowed_document_types:
       - "Gazette Notification"
       - "Advisory"
-    url: "https://fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf"
+    # [ENGINEERING RECOMMENDATION] URL updated (Phase 23.3 Step 2D): the
+    # original production URL below (fssai.gov.in) went stale - it now
+    # returns the FSSAI site's HTML shell (HTTP 200) instead of the PDF.
+    # The replacement is FSSAI's own verified legacy/staging subdomain
+    # (stg-old.fssai.gov.in), which still serves the identical file at the
+    # identical path. Document identity was independently verified from
+    # the actual downloaded PDF (Phase 23.3 Step 2C): 27/27 pages
+    # extracted via the existing Phase 3 extractor, SHA-256
+    # 1ae8cfc632fad0a775316a84999a48adb6cf4b47d05bd4faa75f5190c511f699,
+    # text confirms "Food Safety and Standards (Ayurveda Aahara)
+    # Regulations, 2022" (Gazette of India, Extraordinary, Part III,
+    # Section 4, No. 240, 6 May 2022; notification dateline 5 May 2022;
+    # Gazette tracking 3092 GI/2022 (1); issuing authority FSSAI). KNOWN
+    # OPERATIONAL RISK: "stg-old" names a legacy/staging host, not FSSAI's
+    # current production site - its long-term availability is not
+    # guaranteed and should be re-verified before actual corpus admission.
+    url: "https://stg-old.fssai.gov.in/upload/notifications/2022/05/62789a20b54bdGazette_Notification_Ayurveda_Aahara_09_05_2022.pdf"
     additional_urls:
       - "https://www.fssai.gov.in/food-law/advisories"
     provenance_requirements:

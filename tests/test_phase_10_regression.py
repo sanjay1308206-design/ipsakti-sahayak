@@ -22,6 +22,14 @@ CONFIG_DIR = REPO_ROOT / "config"
 SRC_DIR = REPO_ROOT / "src"
 
 MASTER_REFERENCE_PDF = REPO_ROOT / "PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf"
+
+# [ENGINEERING RECOMMENDATION] Phase 23.3.2E legitimately admitted the
+# project's first real, non-synthetic corpus document (SF-05, FSSAI) -
+# the corpus-document-file scan below now allows exactly this one
+# additional file alongside the Master Reference PDF, never anything
+# else. Disclosed phase-boundary amendment, not a weakening: any OTHER
+# unexpected document-like file is still rejected.
+ADMITTED_SF05_PDF = REPO_ROOT / "data" / "raw" / "SF-05" / "SF05-FSSAI-AYURVEDA-AAHARA-REGULATIONS-2022.pdf"
 MASTER_REFERENCE_HASH_FILE = DOCS_DIR / "_master_reference.sha256"
 
 EXPECTED_CONFIG_FILES_THROUGH_PHASE_9 = {
@@ -69,6 +77,12 @@ FUTURE_IMPLEMENTATION_MODULE_HINTS = (
 )
 
 FORBIDDEN_DEPENDENCY_PACKAGES = (
+    # LD-1 (Production Generation Provider, post-Phase-23): "google-genai" is no
+    # longer forbidden - it is now an authorized runtime dependency
+    # (requirements-dev.txt/requirements-render.txt), used ONLY by the one,
+    # isolated src/generation/gemini_provider.py adapter
+    # (generation.provider_factory.build_generation_provider_from_env is the sole
+    # place it is ever selected). Every other package below remains forbidden.
     "langchain",
     "llama-index",
     "llamaindex",
@@ -83,7 +97,6 @@ FORBIDDEN_DEPENDENCY_PACKAGES = (
     "tiktoken",
     "openai",
     "google-generativeai",
-    "google-genai",
     "transformers",
     "llama-cpp-python",
 )
@@ -270,7 +283,12 @@ def test_generation_config_files_exist():
 
 def test_generation_source_directory_contains_expected_files():
     generation_dir = SRC_DIR / "generation"
-    expected_files = {"__init__.py", "models.py", "prompts.py", "providers.py", "grounding.py", "generator.py", "serialize.py"}
+    expected_files = {"__init__.py", "models.py", "prompts.py", "providers.py", "grounding.py", "generator.py", "serialize.py",
+        # LD-1 (Production Generation Provider, post-Phase-23): the real Gemini
+        # adapter + its environment-config factory, isolated behind the existing
+        # GenerationProvider interface - see src/generation/gemini_provider.py and
+        # src/generation/provider_factory.py.
+        "gemini_provider.py", "provider_factory.py"}
     assert {p.name for p in generation_dir.glob("*.py")} == expected_files
 
 
@@ -291,7 +309,17 @@ def test_no_backend_frontend_or_deployment_directories_exist():
 
 
 def test_no_phase_11_or_later_directories_exist_yet():
-    for forbidden in ("classification", "jurisdiction", "confidence", "escalation", "data", "corpus", "indexes", "index"):
+    # [ENGINEERING RECOMMENDATION] "data"/"corpus" removed from this
+    # list: Phase 23.3.2E legitimately introduces the project's first
+    # real, admitted corpus document (data/raw/, data/manifest/,
+    # data/normalized/ - config/authority_matrix.yaml SF-05), so this
+    # historical pre-corpus guard is no longer valid for those two
+    # names specifically. Disclosed phase-boundary amendment, the same
+    # pattern already used for "scripts"/".github" in Phase 22 - never
+    # a silent weakening. Every other forbidden name here (indexes,
+    # index, vector stores, etc.) remains unchanged and still enforced,
+    # since no BM25/dense index has been built yet.
+    for forbidden in ("classification", "jurisdiction", "confidence", "escalation", "indexes", "index"):
         assert not (REPO_ROOT / forbidden).exists(), (
             f"'{forbidden}/' would imply Phase 11+ functionality, which Phase 10 must not create"
         )
@@ -312,8 +340,19 @@ def test_no_forbidden_llm_sdk_or_web_framework_imports_anywhere_in_generation_so
         "torch", "transformers", "sentence_transformers", "faiss",
         "requests", "httpx", "grpc",
     )
+    # LD-1 (Production Generation Provider, post-Phase-23): exactly ONE file
+    # is now exempt from the "google" root - src/generation/gemini_provider.py,
+    # the sole, isolated adapter authorized to import the real `google-genai`
+    # SDK (always lazily, inside a method body, never at module import time -
+    # see that file's own docstring). Every other file in this directory,
+    # including provider_factory.py (which only ever imports
+    # gemini_provider.GeminiGenerationProvider, never `google` directly),
+    # remains fully covered by this check.
+    exempt_files = {"gemini_provider.py"}
     import_line_re = re.compile(r"^\s*(?:import|from)\s+([\w\.]+)", re.MULTILINE)
     for py_file in (SRC_DIR / "generation").glob("*.py"):
+        if py_file.name in exempt_files:
+            continue
         text = py_file.read_text(encoding="utf-8")
         for module in import_line_re.findall(text):
             top_level = module.split(".")[0].lower()
@@ -371,7 +410,7 @@ def test_no_corpus_document_files_exist_anywhere():
         for p in REPO_ROOT.rglob("*")
         if p.is_file() and p.suffix.lower() in doc_like_extensions and not is_repo_scan_excluded(p) and "frontend" not in p.parts
     ]
-    assert found == [MASTER_REFERENCE_PDF], (
+    assert set(found) == {MASTER_REFERENCE_PDF, ADMITTED_SF05_PDF}, (
         f"unexpected document-like file(s) found (possible ingestion/corpus leakage): {found}"
     )
 

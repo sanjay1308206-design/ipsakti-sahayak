@@ -11,7 +11,15 @@ architecture.
 
 Explicitly out of scope here: Evidence Pack architecture, citation
 validation, claim/evidence binding, grounded generation (Phase 8-10), the
-jurisdiction firewall (Phase 12), the confidence engine (Phase 13).
+jurisdiction firewall (Phase 12), the confidence engine (Phase 13) -
+with one narrow, disclosed exception: `production_corpus.py` (LD-2,
+Production Corpus & Retrieval) depends on `evidence.builder` (to expose
+a ready-to-wire `Callable[[str], EvidencePack]`) and on
+`ingestion.pipeline`/`chunking.chunker` (to deterministically rebuild the
+one real, admitted SF-05 document at runtime, never a second loader over
+a persisted JSON snapshot). It is not imported by this package's own
+`__init__.py` and is not required for any of the retrieval primitives
+below.
 """
 
 from .embeddings import (

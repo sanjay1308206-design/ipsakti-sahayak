@@ -9,22 +9,28 @@ Phase 14 (multilingual delivery) -> Phase 15 (human review) together for
 one request. It never re-implements any of their decisions.
 
 HONESTY ABOUT WHAT IS ACTUALLY EXECUTABLE (docs Section F, "do NOT fake an
-end-to-end pipeline"): this repository contains no ingested authoritative
-corpus (Phase 2/3 established policy/schema only - confirmed by every
-prior phase's own regression check that no corpus document files exist).
-`default_evidence_pack_builder` therefore returns a REAL, honestly EMPTY
-Phase 8 `EvidencePack` for every query - this drives Phase 10's own
+end-to-end pipeline"): `default_evidence_pack_builder` (this module's own
+`evidence_pack_builder` dataclass-field default) returns a REAL, honestly
+EMPTY Phase 8 `EvidencePack` for every query - this drives Phase 10's own
 already-real "no evidence -> ABSTAIN" path, never a fabricated one. A
-real corpus/retrieval index can be wired in later by passing a different
-`evidence_pack_builder` callable - no change to this module would be
-required.
+real corpus/retrieval index is wired in by passing a different
+`evidence_pack_builder` callable - no change to this module was required
+to do so: `retrieval.production_corpus.sf05_evidence_pack_builder` (LD-2,
+the one real, admitted SF-05 document) is that callable, wired in for the
+running app by `src/api/dependencies.py::get_application_service` (LD-3).
+This class's own default remains the empty builder - only the dependency
+wiring changed.
 
-A `GenerationProvider` MUST be explicitly supplied - there is no live
-Gemini/Qwen adapter anywhere in this repository (Phase 10's own
-`[DEFERRED]` boundary, unchanged here). If none is configured,
-`query()` raises `GenerationProviderNotConfiguredError` immediately,
-before any other work - an explicit application failure, never a silent
-substitution or a fabricated answer.
+A `GenerationProvider` MUST be explicitly supplied - this class itself
+never chooses, constructs, or falls back to one. A real, network-calling
+adapter now exists (`generation.gemini_provider.GeminiGenerationProvider`,
+LD-1), wired in for the running app by
+`src/api/dependencies.py::get_application_service` when the environment
+is configured for it (`generation.provider_factory`); this module is
+unchanged either way. If no provider is configured, `query()` raises
+`GenerationProviderNotConfiguredError` immediately, before any other
+work - an explicit application failure, never a silent substitution or a
+fabricated answer.
 """
 
 from __future__ import annotations

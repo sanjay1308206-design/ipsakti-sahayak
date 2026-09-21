@@ -21,6 +21,14 @@ CONFIG_DIR = REPO_ROOT / "config"
 SRC_DIR = REPO_ROOT / "src"
 
 MASTER_REFERENCE_PDF = REPO_ROOT / "PS_26045_IP_SAKTI_COMPLETE_RESEARCH_MASTER_REFERENCE.pdf"
+
+# [ENGINEERING RECOMMENDATION] Phase 23.3.2E legitimately admitted the
+# project's first real, non-synthetic corpus document (SF-05, FSSAI) -
+# the corpus-document-file scan below now allows exactly this one
+# additional file alongside the Master Reference PDF, never anything
+# else. Disclosed phase-boundary amendment, not a weakening: any OTHER
+# unexpected document-like file is still rejected.
+ADMITTED_SF05_PDF = REPO_ROOT / "data" / "raw" / "SF-05" / "SF05-FSSAI-AYURVEDA-AAHARA-REGULATIONS-2022.pdf"
 MASTER_REFERENCE_HASH_FILE = DOCS_DIR / "_master_reference.sha256"
 
 EXPECTED_CONFIG_FILES_THROUGH_PHASE_16 = {
@@ -38,8 +46,14 @@ EXPECTED_CONFIG_FILES_THROUGH_PHASE_16 = {
 FUTURE_IMPLEMENTATION_MODULE_HINTS = ("scraper", "crawler", "ocr", "pdf_parser", "risk_scoring")
 
 FORBIDDEN_DEPENDENCY_PACKAGES = (
+    # LD-1 (Production Generation Provider, post-Phase-23): "google-genai" is no
+    # longer forbidden - it is now an authorized runtime dependency
+    # (requirements-dev.txt/requirements-render.txt), used ONLY by the one,
+    # isolated src/generation/gemini_provider.py adapter
+    # (generation.provider_factory.build_generation_provider_from_env is the sole
+    # place it is ever selected). Every other package below remains forbidden.
     "langchain", "llama-index", "llamaindex", "chromadb", "qdrant", "weaviate", "pinecone", "kubernetes", "neo4j",
-    "rank-bm25", "rank_bm25", "tiktoken", "openai", "google-generativeai", "google-genai", "transformers",
+    "rank-bm25", "rank_bm25", "tiktoken", "openai", "google-generativeai", "transformers",
     "llama-cpp-python", "geopy", "geoip2", "sqlalchemy", "psycopg2", "celery", "redis", "django",
 )
 
@@ -103,7 +117,12 @@ def test_all_prior_phase_source_directories_untouched_by_phase_17():
     assert {p.name for p in (SRC_DIR / "classification").glob("*.py")} == {"__init__.py", "models.py", "rules.py", "classifier.py", "serialize.py"}
     assert {p.name for p in (SRC_DIR / "evidence").glob("*.py")} == {"__init__.py", "models.py", "identity.py", "builder.py", "validation.py", "serialize.py"}
     assert {p.name for p in (SRC_DIR / "citation").glob("*.py")} == {"__init__.py", "models.py", "validator.py", "metrics.py", "serialize.py"}
-    assert {p.name for p in (SRC_DIR / "generation").glob("*.py")} == {"__init__.py", "models.py", "prompts.py", "providers.py", "grounding.py", "generator.py", "serialize.py"}
+    assert {p.name for p in (SRC_DIR / "generation").glob("*.py")} == {"__init__.py", "models.py", "prompts.py", "providers.py", "grounding.py", "generator.py", "serialize.py",
+        # LD-1 (Production Generation Provider, post-Phase-23): the real Gemini
+        # adapter + its environment-config factory, isolated behind the existing
+        # GenerationProvider interface - see src/generation/gemini_provider.py and
+        # src/generation/provider_factory.py.
+        "gemini_provider.py", "provider_factory.py"}
     assert {p.name for p in (SRC_DIR / "jurisdiction").glob("*.py")} == {"__init__.py", "models.py", "policy.py", "firewall.py", "filtering.py", "serialize.py"}
     assert {p.name for p in (SRC_DIR / "safety").glob("*.py")} == {"__init__.py", "models.py", "policy.py", "evaluator.py", "serialize.py"}
     assert {p.name for p in (SRC_DIR / "multilingual").glob("*.py")} == {"__init__.py", "models.py", "preservation.py", "providers.py", "delivery.py", "serialize.py"}
@@ -139,7 +158,17 @@ def test_no_frontend_deployment_or_observability_directories_exist():
 
 
 def test_no_phase_18_or_later_directories_exist_yet():
-    for forbidden in ("reviewers", "data", "corpus", "indexes", "index"):
+    # [ENGINEERING RECOMMENDATION] "data"/"corpus" removed from this
+    # list: Phase 23.3.2E legitimately introduces the project's first
+    # real, admitted corpus document (data/raw/, data/manifest/,
+    # data/normalized/ - config/authority_matrix.yaml SF-05), so this
+    # historical pre-corpus guard is no longer valid for those two
+    # names specifically. Disclosed phase-boundary amendment, the same
+    # pattern already used for "scripts"/".github" in Phase 22 - never
+    # a silent weakening. Every other forbidden name here (indexes,
+    # index, vector stores, etc.) remains unchanged and still enforced,
+    # since no BM25/dense index has been built yet.
+    for forbidden in ("reviewers", "indexes", "index"):
         assert not (REPO_ROOT / forbidden).exists(), f"'{forbidden}/' would imply Phase 18+ functionality, which Phase 17 must not create"
 
 
@@ -235,14 +264,20 @@ def test_no_new_dependency_declared_beyond_phase_6_plus_phase_17_baseline():
             declared_packages.add(name)
     for pkg in FORBIDDEN_DEPENDENCY_PACKAGES:
         assert pkg.lower() not in declared_packages, f"forbidden dependency actually declared: {pkg}"
-    expected = {"pytest", "pyyaml", "pypdf", "sentence-transformers", "faiss-cpu", "numpy", "fastapi", "pydantic", "uvicorn", "httpx"}
+    expected = {
+        "pytest", "pyyaml", "pypdf", "sentence-transformers", "faiss-cpu", "numpy", "fastapi", "pydantic", "uvicorn", "httpx",
+        # LD-1 (Production Generation Provider, post-Phase-23): see
+        # test_phase_19_regression.py::EXPECTED_PY_DEPENDENCIES for the
+        # same addition and its rationale.
+        "google-genai",
+    }
     assert declared_packages == expected, f"unexpected dependency set: {declared_packages}"
 
 
 def test_no_corpus_document_files_exist_anywhere():
     doc_like_extensions = (".pdf", ".html", ".htm", ".docx", ".doc")
     found = [p for p in REPO_ROOT.rglob("*") if p.is_file() and p.suffix.lower() in doc_like_extensions and not is_repo_scan_excluded(p) and "frontend" not in p.parts]
-    assert found == [MASTER_REFERENCE_PDF], f"unexpected document-like file(s) found (possible ingestion/corpus leakage): {found}"
+    assert set(found) == {MASTER_REFERENCE_PDF, ADMITTED_SF05_PDF}, f"unexpected document-like file(s) found (possible ingestion/corpus leakage): {found}"
 
 
 def test_no_eval_or_exec_anywhere_in_new_source():

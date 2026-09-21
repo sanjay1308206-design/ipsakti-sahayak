@@ -35,7 +35,17 @@ secrets.json
 logs/
 
 # --- Corpus data (raw/normalized) — not committed by default ---
-data/raw/
+# LD-2 (Production Corpus & Retrieval): data/raw/ is ignored by default,
+# with ONE narrow, explicit exception below for the single validated
+# SF-05 source PDF - the tracked runtime artifact strategy this phase's
+# own implementation report documents (Render's Free plan has no
+# persistent disk and only deploys git-committed files - a file that
+# is never committed can never reach the deployed backend). Every other
+# raw document remains untracked by default; this is not a blanket
+# re-inclusion of data/raw/.
+data/raw/*
+!data/raw/SF-05/
+!data/raw/SF-05/SF05-FSSAI-AYURVEDA-AAHARA-REGULATIONS-2022.pdf
 data/normalized/
 data/chunks/
 data/indexes/

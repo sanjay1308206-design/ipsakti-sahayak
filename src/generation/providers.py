@@ -8,14 +8,18 @@ concrete provider instance to `generator.generate_grounded_response`;
 nothing in this package chooses, guesses, or silently falls back to a
 different provider.
 
-Only `FakeGenerationProvider` is implemented here. A real Gemini Flash or
-local Qwen2.5-3B adapter is `[DEFERRED]`/`[ASSUMPTION]` - neither
-credentials nor a downloaded model can be assumed to exist in this
-environment (per explicit instruction), and forcing either would violate
-"do not require an API key for the test suite" / "do not download a
-large model automatically." A future adapter would subclass
+Only `FakeGenerationProvider` is implemented here, so importing this
+module never requires a credential and this module's own tests never
+require an API key. A real, network-calling adapter
+(`generation.gemini_provider.GeminiGenerationProvider`, LD-1) is
+implemented in a sibling module instead - it subclasses
 `GenerationProvider` exactly like `FakeGenerationProvider` does, with no
-change required anywhere else in this package.
+change required anywhere in this module. Neither adapter is chosen
+automatically: `generation.provider_factory.build_generation_provider_from_env`
+is the one place a real provider is constructed from environment
+configuration for the running app (`src/api/dependencies.py`); every
+other caller, including every test in this repository, passes a provider
+instance explicitly.
 """
 
 from __future__ import annotations

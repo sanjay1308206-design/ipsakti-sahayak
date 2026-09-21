@@ -60,3 +60,15 @@ uvicorn>=0.42,<0.43
 numpy>=2,<3
 faiss-cpu>=1,<2
 PyYAML>=6,<7
+
+# --- LD-1: Production Generation Provider ---
+# google-genai: the official Google Gen AI Python SDK
+# (https://github.com/googleapis/python-genai), imported lazily inside
+# `src/generation/gemini_provider.py::GeminiGenerationProvider.__init__`
+# - it is only ever imported at all when GENERATION_PROVIDER=gemini is
+# actually set (see src/generation/provider_factory.py), so a deployment
+# that leaves the generation provider unconfigured never pays this
+# import cost and never needs a credential. Pinned by major version
+# (same convention as pydantic above, itself past 1.0 with strong
+# inter-minor API stability); verified working at 2.23.0.
+google-genai>=2,<3

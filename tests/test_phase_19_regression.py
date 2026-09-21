@@ -27,6 +27,11 @@ MASTER_REFERENCE_HASH_FILE = DOCS_DIR / "_master_reference.sha256"
 
 EXPECTED_PY_DEPENDENCIES = {
     "pytest", "pyyaml", "pypdf", "sentence-transformers", "faiss-cpu", "numpy", "fastapi", "pydantic", "uvicorn", "httpx",
+    # LD-1 (Production Generation Provider, post-Phase-23): the official
+    # Google Gen AI SDK, used only by the isolated
+    # src/generation/gemini_provider.py adapter - see that file and
+    # generation/provider_factory.py.
+    "google-genai",
 }
 EXPECTED_FRONTEND_RUNTIME_DEPENDENCIES = {"react", "react-dom"}
 
@@ -138,7 +143,17 @@ def test_no_phase_20_or_later_directories_exist_yet():
     # dropping fastapi from ten earlier forbidden-dependency lists) -
     # never a silent removal, and every other forbidden name here is
     # unchanged and still enforced.
-    for forbidden in ("deployment", "observability", "k8s", "kubernetes", "reviewers", "data", "corpus", "indexes", "index"):
+    # [ENGINEERING RECOMMENDATION] "data"/"corpus" removed from this
+    # list: Phase 23.3.2E legitimately introduces the project's first
+    # real, admitted corpus document (data/raw/, data/manifest/,
+    # data/normalized/ - config/authority_matrix.yaml SF-05), so this
+    # historical pre-corpus guard is no longer valid for those two
+    # names specifically. Disclosed phase-boundary amendment, the same
+    # pattern already used for "scripts"/".github" in Phase 22 - never
+    # a silent weakening. Every other forbidden name here (indexes,
+    # index, vector stores, etc.) remains unchanged and still enforced,
+    # since no BM25/dense index has been built yet.
+    for forbidden in ("deployment", "observability", "k8s", "kubernetes", "reviewers", "indexes", "index"):
         assert not (REPO_ROOT / forbidden).exists(), f"'{forbidden}/' would imply Phase 20+ functionality, which Phase 19 must not create"
 
 
