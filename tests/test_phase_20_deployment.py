@@ -31,18 +31,28 @@ EXPECTED_DEV_DEPENDENCIES = {
 # triggering ingestion's own `import yaml`), each proving the package IS
 # required at application STARTUP - see requirements-render.txt's own
 # header comment for the full, corrected import-chain explanation of
-# both. `pypdf` was checked the same way (a clean venv with only this
-# file's packages was proven to start successfully WITHOUT pypdf
-# installed) and correctly stays forbidden: `ingestion/extractors.py`
-# imports it lazily, inside a function, never at module top level, and
-# nothing on the deployed app's startup or default request path calls
-# that function. `sentence-transformers`/`torch`/`transformers` remain
-# forbidden for the same reason (lazy, inside `SentenceTransformerEmbeddingModel`/
+# both. `sentence-transformers`/`torch`/`transformers` remain forbidden
+# (lazy, inside `SentenceTransformerEmbeddingModel`/
 # `CrossEncoderReranker`'s own load methods, never called by the default
 # path). `pytest`/`httpx` remain forbidden - test-only, never imported by
 # `src/api/`/`src/application/` or anything they call.
+#
+# LD-2 corpus_status fix: `pypdf` moved here from
+# FORBIDDEN_RENDER_DEPENDENCIES. It used to be correctly forbidden
+# because nothing on the deployed app's default path called
+# `ingestion/extractors.py::extract_pdf` (its lazy, function-local
+# `import pypdf`). That premise changed deliberately: `GET /health`
+# (src/api/routes.py) now calls
+# `retrieval.production_corpus.sf05_corpus_status()` so `corpus_status`
+# stops being a hardcoded placeholder - that probe rebuilds and
+# integrity-verifies the real SF-05 index in-process
+# (`load_validated_sf05_index` -> `ingestion.pipeline.ingest_bytes` ->
+# `extract_pdf`), which needs pypdf. Missing it would turn every
+# `/health` call into an uncaught `ModuleNotFoundError` (500) on Render
+# instead of a clean status - the same class of real deployment failure
+# Fix 1/Fix 2 above already document for numpy/faiss-cpu/PyYAML.
 EXPECTED_RENDER_DEPENDENCIES = {
-    "fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml",
+    "fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml", "pypdf",
     # LD-1 (Production Generation Provider, post-Phase-23): required at
     # deployed-app STARTUP only when GENERATION_PROVIDER=gemini is
     # actually set (generation/gemini_provider.py imports it lazily) -
@@ -51,7 +61,7 @@ EXPECTED_RENDER_DEPENDENCIES = {
     # for numpy/faiss-cpu/pyyaml above.
     "google-genai",
 }
-FORBIDDEN_RENDER_DEPENDENCIES = {"pytest", "pypdf", "sentence-transformers", "httpx", "torch", "transformers"}
+FORBIDDEN_RENDER_DEPENDENCIES = {"pytest", "sentence-transformers", "httpx", "torch", "transformers"}
 
 SECRET_ASSIGNMENT_PATTERN = re.compile(
     r'(api[_-]?key|password|access[_-]?token|auth[_-]?token|secret[_-]?key)\s*[=:]\s*["\']?[^"\'\s]{4,}', re.IGNORECASE
@@ -94,7 +104,7 @@ def test_requirements_render_pins_match_requirements_dev_pins():
                 return stripped
         raise AssertionError(f"{package} not found")
 
-    for package in ("fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml"):
+    for package in ("fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml", "pypdf"):
         assert _pin(render_text, package) == _pin(dev_text, package)
 
 
