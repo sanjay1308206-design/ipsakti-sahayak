@@ -81,6 +81,21 @@ def test_default_model_is_used_when_not_overridden():
     assert provider.model_identifier == DEFAULT_GEMINI_MODEL
 
 
+def test_default_gemini_model_is_exactly_gemini_3_5_flash():
+    # LD-4 diagnosis follow-up: `gemini-2.5-flash` (the original LD-1
+    # default) started returning a real, confirmed
+    # `google.genai.errors.APIError(code=404, status=NOT_FOUND)` in
+    # production - a live smoke test (google-genai==2.24.0, same API
+    # key, `client.models.generate_content`) confirmed `gemini-3.5-flash`
+    # responds successfully instead. This test locks in the literal
+    # value (not just self-referential equality against the constant) so
+    # a future edit cannot silently revert the default back to the
+    # broken model.
+    assert DEFAULT_GEMINI_MODEL == "gemini-3.5-flash"
+    provider = _provider()
+    assert provider.model_identifier == "gemini-3.5-flash"
+
+
 def test_generate_rejects_non_string_prompt():
     provider = _provider()
     with pytest.raises(TypeError):
@@ -225,6 +240,96 @@ def test_generate_unexpected_exception_never_leaks_the_api_key_or_raw_message():
     # unrecognized exception types (only the class name is safe to
     # surface to an end user), never merely redacted-in-place.
     assert "authenticating" not in output.failure_reason
+
+
+def test_generate_api_error_logs_code_status_and_sanitized_reason(caplog):
+    # LD-4 diagnosis follow-up: the Render runtime log for a real
+    # production APIError only ever showed `code=404 status=NOT_FOUND`
+    # with no message text, because the log call omitted the reason
+    # string entirely - this test locks in the fix (the same
+    # already-redacted `reason` used for `failure_reason` must also
+    # reach the log record) so a future failure is diagnosable directly
+    # from Render logs without needing a source-code cross-reference.
+    from google.genai import errors as genai_errors
+
+    provider = _provider()
+
+    def raise_api_error(**kwargs):
+        raise genai_errors.APIError(code=404, response_json={"message": "model not found", "status": "NOT_FOUND"})
+
+    provider._client.models.generate_content = raise_api_error
+
+    with caplog.at_level("ERROR", logger="ipsakti.generation.gemini"):
+        output = provider.generate("prompt")
+
+    assert output.success is False
+    [record] = [r for r in caplog.records if "APIError" in r.message]
+    assert "code=404" in record.message
+    assert "status=NOT_FOUND" in record.message
+    assert "model not found" in record.message
+    # The logged reason must be exactly the same sanitized text handed
+    # back to the caller in `failure_reason` - no separate, divergent
+    # copy of the message.
+    assert output.failure_reason in record.message
+
+
+def test_generate_api_error_log_never_leaks_the_api_key(caplog):
+    from google.genai import errors as genai_errors
+
+    secret = "super-secret-value-zzz"
+    provider = _provider(api_key=secret)
+
+    def raise_api_error(**kwargs):
+        raise genai_errors.APIError(code=401, response_json={"message": f"key {secret} rejected", "status": "UNAUTHENTICATED"})
+
+    provider._client.models.generate_content = raise_api_error
+
+    with caplog.at_level("ERROR", logger="ipsakti.generation.gemini"):
+        provider.generate("prompt")
+
+    for record in caplog.records:
+        assert secret not in record.message
+        assert secret not in record.getMessage()
+
+
+def test_generate_api_error_log_never_contains_the_prompt_text(caplog):
+    # The log call must only ever carry the SDK's own `code`/`status`/
+    # `message` fields - never the caller-supplied prompt (which embeds
+    # the EvidencePack/citation-instruction text).
+    from google.genai import errors as genai_errors
+
+    provider = _provider()
+
+    def raise_api_error(**kwargs):
+        raise genai_errors.APIError(code=404, response_json={"message": "model not found", "status": "NOT_FOUND"})
+
+    provider._client.models.generate_content = raise_api_error
+    secret_prompt = "UNIQUE-EVIDENCE-PACK-MARKER-should-never-be-logged"
+
+    with caplog.at_level("ERROR", logger="ipsakti.generation.gemini"):
+        provider.generate(secret_prompt)
+
+    for record in caplog.records:
+        assert secret_prompt not in record.getMessage()
+
+
+def test_generate_api_error_failure_reason_format_unchanged():
+    # The logging fix must not alter the caller-visible failure_reason
+    # contract (format, truncation, redaction) established by the
+    # existing failure-mode tests above - only additional logging output
+    # was added.
+    from google.genai import errors as genai_errors
+
+    provider = _provider()
+
+    def raise_api_error(**kwargs):
+        raise genai_errors.APIError(code=404, response_json={"message": "model not found", "status": "NOT_FOUND"})
+
+    provider._client.models.generate_content = raise_api_error
+    output = provider.generate("prompt")
+
+    assert output.failure_reason == "Gemini API error 404 (NOT_FOUND): model not found"
+    assert len(output.failure_reason) <= 500
 
 
 def test_generate_never_raises_for_any_sdk_failure_mode():

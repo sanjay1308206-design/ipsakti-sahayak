@@ -54,16 +54,18 @@ from .providers import GenerationProvider
 
 logger = logging.getLogger("ipsakti.generation.gemini")
 
-# [ENGINEERING RECOMMENDATION] `gemini-2.5-flash` is a current, stable,
-# generally-available Gemini API model at LD-1 implementation time
-# (verified against https://ai.google.dev/gemini-api/docs/models),
-# documented by Google as its "best price-performance" low-latency Flash
-# tier model - a reasonable default for a free-tier, cost-conscious
-# deployment. This is an engineering choice, not a Master Reference
-# requirement, and is fully overridable per-deployment via the
-# GENERATION_MODEL environment variable (see generation/provider_factory.py)
-# without any code change.
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+# [ENGINEERING RECOMMENDATION] `gemini-2.5-flash` was the original LD-1
+# default but started returning `google.genai.errors.APIError(code=404,
+# status=NOT_FOUND)` in production (LD-4 diagnosis) - confirmed by a real
+# `client.models.generate_content` smoke test (google-genai==2.24.0, same
+# API key) that Google no longer serves that model to this key/project.
+# `gemini-3.5-flash` is the model that same smoke test confirmed working
+# (`GEMINI_SMOKE_OK`) against the identical SDK version and key, so it
+# replaces `gemini-2.5-flash` as the default here. This remains an
+# engineering choice, not a Master Reference requirement, and is fully
+# overridable per-deployment via the GENERATION_MODEL environment
+# variable (see generation/provider_factory.py) without any code change.
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
 
 # [ENGINEERING RECOMMENDATION] A hard per-request timeout so a stalled
 # network call can never hang an HTTP request indefinitely - not
@@ -154,7 +156,10 @@ class GeminiGenerationProvider(GenerationProvider):
             )
         except genai_errors.APIError as exc:
             reason = _redact(f"Gemini API error {exc.code} ({exc.status}): {exc.message}", self._api_key)
-            logger.error("Gemini generate_content APIError: code=%s status=%s", exc.code, exc.status)
+            logger.error(
+                "Gemini generate_content APIError: code=%s status=%s reason=%s",
+                exc.code, exc.status, reason[:500],
+            )
             return GenerationOutput(
                 raw_text="", provider_name=self.provider_name, model_identifier=self._model,
                 success=False, failure_reason=reason[:500], metadata={},

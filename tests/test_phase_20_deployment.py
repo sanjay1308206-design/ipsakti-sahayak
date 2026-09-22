@@ -104,8 +104,23 @@ def test_requirements_render_pins_match_requirements_dev_pins():
                 return stripped
         raise AssertionError(f"{package} not found")
 
-    for package in ("fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml", "pypdf"):
+    for package in ("fastapi", "pydantic", "uvicorn", "numpy", "faiss-cpu", "pyyaml", "pypdf", "google-genai"):
         assert _pin(render_text, package) == _pin(dev_text, package)
+
+
+def test_google_genai_is_pinned_to_the_exact_ld4_verified_version():
+    # LD-4 Gemini 404 diagnosis follow-up: an unpinned `google-genai>=2,<3`
+    # range let pip resolve 2.24.0 locally while the requirements-render.txt
+    # comment still claimed "verified working at 2.23.0" - a
+    # never-actually-tested version could silently reach production. Pin
+    # to the exact version this diagnosis confirmed installed, so the
+    # declared and the deployed/tested version can never drift again.
+    render_text = (REPO_ROOT / "requirements-render.txt").read_text(encoding="utf-8")
+    dev_text = (REPO_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+
+    for text in (render_text, dev_text):
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip().lower().startswith("google-genai")]
+        assert lines == ["google-genai==2.24.0"], lines
 
 
 def test_requirements_dev_txt_is_completely_unmodified_by_phase_20():
