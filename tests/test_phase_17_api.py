@@ -50,7 +50,10 @@ def test_health_endpoint(client):
     body = response.json()
     assert body["status"] == "alive"
     assert body["api_version"] == "v1"
-    assert body["corpus_status"] == "NOT_VALIDATED"
+    # LD-2: /health reports the real, integrity-verified SF-05 corpus
+    # status - "VALIDATED" here because the real committed asset is
+    # present in this test environment (see retrieval.production_corpus).
+    assert body["corpus_status"] == "VALIDATED"
 
 
 def test_health_reflects_provider_configuration(app, client):

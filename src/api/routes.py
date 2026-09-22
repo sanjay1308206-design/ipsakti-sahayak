@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends
 from application.config import API_VERSION
 from application.models import APPLICATION_SCHEMA_VERSION, ApplicationQueryRequest
 from application.service import ApplicationService, compute_request_id
+from retrieval.production_corpus import sf05_corpus_status
 
 from .dependencies import get_application_service
 from .schemas import HealthResponse, QueryRequest, QueryResponse, query_response_from_result
@@ -35,14 +36,17 @@ router = APIRouter()
 @router.get("/health", response_model=HealthResponse, tags=["health"])
 def health(service: ApplicationService = Depends(get_application_service)) -> HealthResponse:
     """
-    Verifies only that the process is alive and reports STATIC provider
-    configuration - it never performs a retrieval/model call (docs
-    "Do not perform expensive retrieval/model operations in a simple
-    health endpoint"). `corpus_status` is always `NOT_VALIDATED` - no
-    corpus is ingested anywhere in this repository.
+    Verifies that the process is alive, reports STATIC provider
+    configuration, and reports real `corpus_status` via LD-2's own
+    non-raising probe (`retrieval.production_corpus.sf05_corpus_status`) -
+    `"VALIDATED"` once the real, integrity-verified SF-05 corpus has been
+    built and cached (at most once per process, per that module's own
+    `lru_cache`), `"UNAVAILABLE"` otherwise. The probe never raises, so
+    this endpoint never 500s because of corpus state.
     """
     return HealthResponse(
         api_version=API_VERSION,
+        corpus_status=sf05_corpus_status(),
         generation_provider_configured=service.generation_provider is not None,
         translation_provider_configured=service.translation_provider is not None,
     )

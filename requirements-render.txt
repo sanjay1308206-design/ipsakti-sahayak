@@ -61,6 +61,23 @@ numpy>=2,<3
 faiss-cpu>=1,<2
 PyYAML>=6,<7
 
+# --- LD-2 fix: Production Corpus & Retrieval health wiring ---
+# pypdf: `GET /health` was wired to call
+# `retrieval.production_corpus.sf05_corpus_status()` (previously it never
+# did, which is why `corpus_status` stayed `NOT_VALIDATED` in production
+# forever, regardless of corpus state). That probe rebuilds the real
+# SF-05 index in-process, which calls `ingestion.pipeline.ingest_bytes`,
+# which calls `ingestion.extractors.extract_pdf`, which does a hard,
+# unguarded `import pypdf` (src/ingestion/extractors.py) - lazy (inside
+# the function, not at module top level), but not optional: this file
+# never declared it, so that import would raise
+# `ModuleNotFoundError: No module named 'pypdf'` on Render the moment
+# `/health` (or any query) actually exercised this path, the same class
+# of failure Fix 1/Fix 2 above already document for numpy/faiss-cpu/
+# PyYAML. Same version range as requirements-dev.txt's own Phase 3
+# declaration; verified working at 6.x.
+pypdf>=6,<7
+
 # --- LD-1: Production Generation Provider ---
 # google-genai: the official Google Gen AI Python SDK
 # (https://github.com/googleapis/python-genai), imported lazily inside

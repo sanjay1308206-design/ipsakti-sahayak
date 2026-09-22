@@ -125,11 +125,12 @@ def query_response_from_result(result: ApplicationQueryResult) -> QueryResponse:
 
 class HealthResponse(BaseModel):
     """
-    Distinguishes "process is alive" (the ONLY thing actually verified
-    here - no retrieval/model call is performed) from provider
-    configuration (a cheap, static check) from corpus currentness (always
-    `NOT_VALIDATED` - no corpus is ingested anywhere in this repository,
-    docs Section I).
+    Distinguishes "process is alive" from provider configuration (a
+    cheap, static check) from corpus currentness (`retrieval.
+    production_corpus.sf05_corpus_status()` - LD-2's real, non-raising
+    integrity probe: `"VALIDATED"` once the real SF-05 corpus has been
+    built and verified, `"UNAVAILABLE"` otherwise). The default below is
+    only a fallback for construction sites that don't pass a real value.
     """
 
     status: str = "alive"

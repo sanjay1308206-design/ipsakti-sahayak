@@ -584,7 +584,11 @@ def test_category13_health_endpoint_never_fabricates_readiness(test_client):
     response = test_client.get("/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["corpus_status"] == "NOT_VALIDATED"
+    # LD-2: corpus_status now reflects the real, integrity-verified SF-05
+    # probe (VALIDATED here, since the real asset is present) rather than
+    # a hardcoded placeholder - still never fabricated: generation
+    # readiness is independently, honestly reported as unconfigured below.
+    assert body["corpus_status"] == "VALIDATED"
     assert body["generation_provider_configured"] is False
 
 
