@@ -81,7 +81,7 @@ def test_default_model_is_used_when_not_overridden():
     assert provider.model_identifier == DEFAULT_GEMINI_MODEL
 
 
-def test_default_gemini_model_is_exactly_gemini_3_5_flash():
+def test_default_gemini_model_is_exactly_gemini_3_6_flash():
     # LD-4 diagnosis follow-up: `gemini-2.5-flash` (the original LD-1
     # default) started returning a real, confirmed
     # `google.genai.errors.APIError(code=404, status=NOT_FOUND)` in
@@ -91,9 +91,9 @@ def test_default_gemini_model_is_exactly_gemini_3_5_flash():
     # value (not just self-referential equality against the constant) so
     # a future edit cannot silently revert the default back to the
     # broken model.
-    assert DEFAULT_GEMINI_MODEL == "gemini-3.5-flash"
+    assert DEFAULT_GEMINI_MODEL == "gemini-3.6-flash"
     provider = _provider()
-    assert provider.model_identifier == "gemini-3.5-flash"
+    assert provider.model_identifier == "gemini-3.6-flash"
 
 
 def test_generate_rejects_non_string_prompt():

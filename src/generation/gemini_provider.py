@@ -65,7 +65,7 @@ logger = logging.getLogger("ipsakti.generation.gemini")
 # engineering choice, not a Master Reference requirement, and is fully
 # overridable per-deployment via the GENERATION_MODEL environment
 # variable (see generation/provider_factory.py) without any code change.
-DEFAULT_GEMINI_MODEL = "gemini-3.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 
 # [ENGINEERING RECOMMENDATION] A hard per-request timeout so a stalled
 # network call can never hang an HTTP request indefinitely - not
