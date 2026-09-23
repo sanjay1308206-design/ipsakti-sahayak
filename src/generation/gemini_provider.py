@@ -71,7 +71,7 @@ DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 # network call can never hang an HTTP request indefinitely - not
 # mandated by any Master Reference contract, but a basic production
 # safety property for a live-demo backend.
-DEFAULT_TIMEOUT_SECONDS = 30.0
+DEFAULT_TIMEOUT_SECONDS = 60.0
 
 
 def _redact(text: str, secret: str) -> str:
